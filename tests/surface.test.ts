@@ -143,6 +143,7 @@ test("2D image commands default to gpt-image-2 and share the aspect-ratio surfac
     // advertised in the help text rather than pinned on the commander Option.
     assert.equal(model?.defaultValue, undefined, resource);
     assert.match(model?.description ?? "", /gpt-image-2 \(default/, resource);
+    assert.ok(model?.argChoices?.includes("nano-banana-2-1"), `${resource} lost nano-banana-2-1`);
     assert.ok(model?.argChoices?.includes("nano-banana-2-lite"), `${resource} lost nano-banana-2-lite`);
     for (const tier of ["gpt-image-2-5-flare", "gpt-image-2-5-sunburst"]) {
       assert.ok(model?.argChoices?.includes(tier), `${resource} is missing ${tier}`);
