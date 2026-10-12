@@ -47,6 +47,7 @@ import {
   buildTaskResult,
   emitTerminalOutcome,
   preflightOutputPath,
+  retriedWarning,
   submitCreate,
   taskNextCommands,
   wrapWithResult,
@@ -137,7 +138,7 @@ function pendingSteps(plan: MakePlan, from: number, parentTaskId: string | null,
     requires: `step ${s.index - 1} SUCCEEDED`,
     command:
       s.resource === "text-to-3d" && s.action === "refine"
-        ? `meshy text-to-3d create --mode refine --preview-task-id ${parentTaskId ?? "<preview-task-id>"}${output ? ` -o ${output}` : ""}`
+        ? `${REFINE_RESUME} ${parentTaskId ?? "<preview-task-id>"}${output ? ` -o ${output}` : ""}`
         : null,
   }));
 }
@@ -246,6 +247,7 @@ async function runChain(plan: MakePlan, opts: MakeOptions, timeoutSeconds: numbe
       throw wrapWithResult(err, context);
     }
     const { task, raw, timedOut, aborted } = poll;
+    if (poll.lastError) warnings.push(retriedWarning(poll));
     const elapsed = (performance.now() - started) / 1000;
     executed[executed.length - 1]!.status = task?.status ?? null;
     if (aborted) progress.stop();
@@ -381,6 +383,9 @@ async function finalOutcome(
   await emitEnvelope(okEnvelope("make", { route: plan.route, executed, task: base.task, submission: base.submission, downloads, pending_steps: [] }, warnings), opened.format);
 }
 
+/** make's refine asks for 4k (its preview runs on latest); the resume command asks for the same. */
+const REFINE_RESUME = "meshy text-to-3d create --mode refine --texture-resolution 4k --preview-task-id";
+
 /**
  * One payload builder per step, taking the previous step's task id so the
  * chain stays a function of the plan plus what actually ran.
@@ -437,7 +442,7 @@ export function resumeCommand(
 ): string | undefined {
   if (plan.route !== "text" || !completedTaskId) return undefined;
   const output = runtime.flags.output ? ` -o ${runtime.flags.output}` : "";
-  return `meshy text-to-3d create --mode refine --preview-task-id ${completedTaskId}${output}`;
+  return `${REFINE_RESUME} ${completedTaskId}${output}`;
 }
 
 function stepFailure(

@@ -19,7 +19,10 @@ const spec: ResourceCommandSpec = {
     configure(cmd) {
       return cmd
         .option("--input-task-id <id>", "source SUCCEEDED task (image-to-3d, multi-image-to-3d, text-to-3d, remesh, or retexture using Meshy 6+)")
-        .option("--model-url <src>", "3D model as http(s) URL or local file path (.glb/.gltf/.obj/.fbx/.stl, max 100MB)");
+        .option(
+          "--model-url <src>",
+          "3D model: an http(s) URL (.glb/.gltf/.obj/.fbx/.stl, max 100MB) or a local .glb/.gltf file — the API takes inline uploads as glTF only, so host .stl/.obj/.fbx at a URL",
+        );
     },
     toPayload(opts) {
       if (!opts.inputTaskId && !opts.modelUrl && !opts.data) {

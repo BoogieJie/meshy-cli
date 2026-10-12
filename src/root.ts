@@ -100,7 +100,7 @@ EXAMPLES:
     meshy resources                                # index of every command
     meshy text-to-3d create --mode preview --prompt "a red sports car"
     meshy image-to-3d get <task-id>
-    meshy delete <task-id>                         # unified: works for any task
+    meshy delete <task-id>                         # any task except Creative Lab
 
     # escape hatch for endpoints without a dedicated subcommand
     meshy api GET /balance

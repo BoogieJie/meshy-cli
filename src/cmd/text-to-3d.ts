@@ -50,12 +50,12 @@ const spec: ResourceCommandSpec = {
         .addOption(
           new Option(
             "--texture-resolution <res>",
-            "refine only. Base color texture size (default: 4k)",
+            "refine only. Base color texture size (default: the server's, 2k). 4k/8k need a meshy-6, meshy-7.1 or latest preview — a meshy-6-lite preview refuses them",
           ).choices(["2k", "4k", "8k"]),
         )
         .option(
           "--remove-lighting <bool>",
-          "refine only. Strip baked lighting from the base color (default: true)",
+          "refine only. Strip baked lighting from the base color (default: the server's — on for meshy-6/7; a meshy-6-lite preview refuses the flag)",
           parseBool,
         )
         .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv);
@@ -82,17 +82,18 @@ const spec: ResourceCommandSpec = {
       };
     },
     toDefaults(opts) {
-      // Game-ready refine defaults: full PBR map set and 4k textures, priced
-      // the same as the API's bare defaults. The model is not a choice —
-      // the server default (latest, still Meshy 6 on this endpoint) applies;
-      // override via --data.
+      // Refine inherits its model from the preview, and the task GET does not
+      // say which model that was. So only what every refine target accepts is
+      // pinned here: the full PBR map set. texture_resolution 4k and
+      // remove_lighting are refused (400) for a meshy-6-lite preview, so they
+      // ride only when asked for — the server's own defaults (2k; lighting
+      // removed on meshy-6/7) apply otherwise. `make` still asks for 4k: it
+      // made the preview itself, on latest.
       // GLB-only output — omitting target_formats makes the API produce
       // every format.
       const refine = opts.mode === "refine";
       return {
         enable_pbr: refine ? true : undefined,
-        texture_resolution: refine ? "4k" : undefined,
-        remove_lighting: refine ? true : undefined,
         target_formats: ["glb"],
       };
     },

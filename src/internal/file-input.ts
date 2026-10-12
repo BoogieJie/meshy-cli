@@ -133,13 +133,13 @@ export async function normalizeMediaPayload(
           resolved.push(entry);
           continue;
         }
-        const r = await resolveOne(entry, `${label}[${i}]`, field.kind, field.formats, o);
+        const r = await resolveOne(entry, `${label}[${i}]`, field.kind, field, o);
         resolved.push(r.value);
         media.push({ field: field.path, index: i, source: r.source, mime: r.mime, bytes: r.bytes });
       }
       out[field.path] = resolved;
     } else if (typeof value === "string" && value) {
-      const r = await resolveOne(value, label, field.kind, field.formats, o);
+      const r = await resolveOne(value, label, field.kind, field, o);
       out[field.path] = r.value;
       media.push({ field: field.path, index: null, source: r.source, mime: r.mime, bytes: r.bytes });
     }
@@ -154,16 +154,22 @@ interface Resolved {
   bytes: number | null;
 }
 
+type FormatRule = Pick<MediaField, "formats" | "formatsHint">;
+
+function formatError(flagLabel: string, rule: FormatRule, got: string): UsageError {
+  return new UsageError(`${flagLabel}: this field accepts ${rule.formats!.join("/")} only (${got})${rule.formatsHint ? `; ${rule.formatsHint}` : ""}`);
+}
+
 async function resolveOne(
   input: string,
   flagLabel: string,
   kind: MediaKind,
-  formats: readonly string[] | undefined,
+  rule: FormatRule | undefined,
   o: NormalizeOptions,
 ): Promise<Resolved> {
   const limits: MediaLimits = { ...DEFAULT_MEDIA_LIMITS, ...(o.limits ?? {}) };
   if (/^data:/i.test(input)) {
-    return validateDataUri(input, flagLabel, kind, formats, limits);
+    return validateDataUri(input, flagLabel, kind, rule, limits);
   }
   if (/^https?:\/\//i.test(input)) {
     await preflightUrl(input, flagLabel, limits, o);
@@ -172,7 +178,7 @@ async function resolveOne(
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(input)) {
     throw new UsageError(`${flagLabel}: only http(s) URLs, data: URIs and local file paths are accepted (got ${input.split(":")[0]}: URL)`);
   }
-  return loadLocalFile(input, flagLabel, kind, formats, limits, o.cwd ?? process.cwd());
+  return loadLocalFile(input, flagLabel, kind, rule, limits, o.cwd ?? process.cwd());
 }
 
 const DATA_URI_RE = /^data:([a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+)((?:;[a-z0-9-]+=[^;,]*)*)(;base64)?,(.*)$/is;
@@ -181,7 +187,7 @@ function validateDataUri(
   input: string,
   flagLabel: string,
   kind: MediaKind,
-  formats: readonly string[] | undefined,
+  rule: FormatRule | undefined,
   limits: MediaLimits,
 ): Resolved {
   const m = DATA_URI_RE.exec(input);
@@ -201,11 +207,9 @@ function validateDataUri(
   if (kind === "model" && !(mime.startsWith("model/") || mime === "application/octet-stream")) {
     throw new UsageError(`${flagLabel}: expected a 3D-model data: URI (model/* or application/octet-stream), got ${mime}`);
   }
-  if (formats && formats.length > 0) {
+  if (rule?.formats && rule.formats.length > 0) {
     const ext = extForMime(mime);
-    if (!ext || !formats.includes(ext)) {
-      throw new UsageError(`${flagLabel}: this field accepts ${formats.join("/")} only (data: URI is ${mime})`);
-    }
+    if (!ext || !rule.formats.includes(ext)) throw formatError(flagLabel, rule, `data: URI is ${mime}`);
   }
   return { value: input, source: "data-uri", mime, bytes };
 }
@@ -246,7 +250,7 @@ function loadLocalFile(
   input: string,
   flagLabel: string,
   kind: MediaKind,
-  formats: readonly string[] | undefined,
+  rule: FormatRule | undefined,
   limits: MediaLimits,
   cwd: string,
 ): Resolved {
@@ -268,11 +272,9 @@ function loadLocalFile(
   if (!mime) {
     throw new UsageError(`${flagLabel}: could not detect ${kind === "image" ? "image" : "3d model"} MIME type for ${absPath}`);
   }
-  if (formats && formats.length > 0) {
+  if (rule?.formats && rule.formats.length > 0) {
     const ext = extForMime(mime) ?? extname(absPath).slice(1).toLowerCase();
-    if (!formats.includes(ext)) {
-      throw new UsageError(`${flagLabel}: this field accepts ${formats.join("/")} only (got ${ext || "unknown"})`);
-    }
+    if (!rule.formats.includes(ext)) throw formatError(flagLabel, rule, `got ${ext || "unknown"}`);
   }
   logger.debug(`${flagLabel} inlined ${absPath} as ${mime} data URI (${buffer.length} bytes)`);
   return { value: `data:${mime};base64,${buffer.toString("base64")}`, source: "local-file", mime, bytes: buffer.length };

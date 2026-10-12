@@ -226,14 +226,31 @@ Top-level shortcut:
 
 ```
 meshy-cli delete <task-id>
-    # Meshy's DELETE is unified across resources, but GET is not, so
-    # `get`/`wait`/`stream` live only on their resource.
+    # The shared DELETE accepts a task of any resource except Creative Lab, but
+    # GET is per resource, so `get`/`wait`/`stream` live only on their resource.
 ```
+
+A PENDING task is deleted and refunded. An IN_PROGRESS one is refused by the
+server (409): the CLI reports `conflict`, exit `14`, with the `wait` command
+to run before deleting again. Creative Lab tasks are reached only through
+`meshy creative-lab <product> <stage> delete`, and that one **cancels**: the
+task stays, as `CANCELED` (PENDING refunded, IN_PROGRESS not, a finished task
+refused), and the result says `canceled: true`, `deleted: false`.
 
 `create` is **synchronous by default** — it polls until the task reaches a
 terminal status (`SUCCEEDED` / `FAILED` / `CANCELED`) or `--timeout` hits.
 Pass `--async` to return the `task_id` immediately; then call
 `<resource> get <id>`, `wait <id>` or `stream <id>` when you need the result.
+
+Polling follows the API's [task lifecycle](https://docs.meshy.ai/en/api/task-lifecycle)
+guidance: the interval is the server's `Retry-After` when it sends one, and a
+status request that fails with a `429`, a `5xx`, a read timeout or a dropped
+connection is retried at the next tick — it says nothing about the task. A
+`401`, `404` or malformed task still ends the wait at once. The default
+`--timeout` is 600 s, shorter than the "at least 60 minutes from `created_at`"
+the docs recommend: when it runs out the task keeps running, the error (exit
+`8`) carries the task id, and `wait <id>` resumes. Pass `--timeout 3600` to
+wait the whole hour in one go.
 
 ### Creative Lab
 
@@ -366,7 +383,10 @@ accept:
 
 Missing files and 4xx/5xx preflights exit with code `2` and a flag-prefixed
 message before any task is created. GLB-only fields (`uv-unwrap`, `rigging`
-`--model-url`) reject other formats locally.
+`--model-url`) reject other formats locally. `analyze-printability` and
+`repair-printability` take an inline model (a local file or a `data:` URI) as
+glTF only — `.glb` or `.gltf`; the API refuses inline STL/OBJ/FBX there, so
+host those at an http(s) URL or pass `--input-task-id`.
 
 ## Global flags
 

@@ -921,3 +921,76 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   free. Add a view in `views.ts` only when its payload has URLs, timestamps or a
   list shape. A view must return `null` for a payload it does not recognise,
   never a guess.
+
+
+## D-067 Refine pins only what every refine target accepts
+
+- Refine inherits its model from the preview, and the text-to-3d task GET does
+  not return `ai_model`. The API refuses `remove_lighting` on a refine whose
+  model cannot honour it, and `texture_resolution` 4k/8k on a model without HD
+  textures — so a meshy-6-lite preview answered every default refine with 400.
+- The standalone refine therefore pins `enable_pbr: true` and GLB output only.
+  Omitting `remove_lighting` changes nothing on meshy-6/7: the API's default
+  there is lighting removal on. Omitting `texture_resolution` gives the API's
+  2k; ask for 4k with the flag.
+- `make` keeps 4k and `remove_lighting: true`: it created the preview itself
+  without `ai_model`, so it knows the preview runs on `latest`. Its resume and
+  pending-step commands now carry `--texture-resolution 4k` so a resumed chain
+  produces what an uninterrupted one would.
+
+## D-068 A failed status request is retried at the next tick; `Retry-After` paces polling
+
+- The API docs' task-lifecycle guidance: a failed status request (timeout,
+  429, 5xx) does not mean the task failed — try again at the next poll; the
+  poll interval is the `Retry-After` header when present. The API sends it on
+  task reads and on 429.
+- `pollUntilTerminal` retries a `TransportError` in the connect/request/body/
+  timeout phases and any HTTP 429 or 5xx, sleeping `Retry-After` when sent and
+  the local backoff otherwise, never past the deadline. A refused redirect,
+  4xx other than 429, and a malformed task still end the wait at once.
+- The outcome says what happened: `result.wait.failed_polls`,
+  `result.wait.last_poll_error` and a `poll_retried` warning; an outage that
+  outlasts `--timeout` is `timed_out` (exit 8) naming the last failure, never a
+  bare `server` error. `--timeout 0` stays a single query that reports its
+  failure as-is.
+- The default budget stays 600 s (resumable with `wait`); the help and docs
+  now say the API advises waiting up to 60 minutes and how to ask for it.
+
+## D-069 409 is `conflict`, exit 14
+
+- The API answers `DELETE` of an IN_PROGRESS task with 409 (credits for a
+  started task are not refundable). It used to fall through to `server`,
+  exit 1, which reads as "the server broke".
+- `conflict` is a new error code with its own exit code, 14 — appended, so no
+  existing code moves. The task `delete` verbs attach `recovery.command` (the
+  resource's `wait`); the top-level `delete` does not know the resource and
+  says `meshy <resource> wait <id>`.
+
+## D-070 Printability takes inline models as glTF only
+
+- The printability endpoints accept an inline (`data:`) model only as
+  `model/gltf-binary` or `model/gltf+json`, and the CLI sends every local file
+  inline. A local `.stl`/`.obj`/`.fbx` was therefore a 400 after the round
+  trip. The API has no upload endpoint to use instead.
+- The two printability resources now declare `formats: ["glb", "gltf"]` with a
+  `formatsHint` naming the alternatives (an http(s) URL, which the API fetches
+  and checks itself, or `--input-task-id`). URLs are not format-checked
+  locally.
+- The API docs say data URLs "bypass extension checks"; for these endpoints
+  they do not.
+
+## D-071 `meshy delete` covers everything but Creative Lab; Creative Lab "delete" is a cancel
+
+- The shared `DELETE /openapi/v2/text-to-3d/:id` accepts a task of any
+  resource except Creative Lab, which it answers with 404 (those products have
+  their own per-stage DELETE). The help, the `resources` index and the root
+  help now say so, and a 404 names the Creative Lab command.
+- The per-product Creative Lab DELETE does not delete: it moves PENDING or
+  IN_PROGRESS to `CANCELED` (refunding PENDING only) and refuses a finished
+  task with 400. Its verb now reports `canceled: true, deleted: false`.
+
+## D-072 The animation task type is `animate`
+
+- The API reports animation tasks as `type: "animate"`; the registry said
+  `"animation"`, so `download --task-json` could not match a saved animation
+  task to its resource.

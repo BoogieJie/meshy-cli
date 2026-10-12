@@ -1,6 +1,12 @@
 /**
  * Poll a task endpoint until it reaches a terminal status or the deadline
- * hits. Backoff grows 1.5× per iteration up to a 20s cap.
+ * hits. Backoff grows 1.5× per iteration up to a 20s cap; a `Retry-After` the
+ * server sends (on a task read, a 429 or a 503) replaces it for that tick.
+ *
+ * A failed status request — 429, 5xx, a read timeout, a dropped connection —
+ * says nothing about the task (docs: task-lifecycle "How Long to Wait"), so it
+ * is retried at the next tick instead of ending the wait. Anything else (401,
+ * 404, a malformed task) still ends it at once.
  *
  * The deadline is monotonic and binds everything: every GET is issued with a
  * request timeout no larger than the remaining budget (headers *and* body),
@@ -13,6 +19,7 @@
  */
 
 import type { TaskEndpoint } from "../client/endpoints/base.js";
+import { MeshyApiError } from "../client/errors.js";
 import { TransportError } from "../client/transport.js";
 import { isTerminalStatus, type Task } from "../client/types.js";
 import { UsageError } from "./errors.js";
@@ -23,6 +30,8 @@ export interface PollOptions {
   /** Transport read timeout; each request is capped at min(remaining budget, this). */
   requestTimeoutMs?: number;
   onTick?: (task: Task, raw: unknown) => void;
+  /** Called for each transient status-request failure that will be retried. */
+  onRetry?: (err: MeshyApiError) => void;
   signal?: AbortSignal;
   /** Test hook: injectable clock and sleep. */
   now?: () => number;
@@ -40,6 +49,16 @@ export interface PollResult {
   polls: number;
   /** True when the external signal fired before a terminal status. */
   aborted: boolean;
+  /** Status requests that failed transiently and were retried. */
+  failedPolls: number;
+  /** The last of those failures, if any. */
+  lastError: MeshyApiError | null;
+}
+
+/** A failed status request that says nothing about the task: retry it at the next poll. */
+export function isTransientPollError(err: unknown): err is MeshyApiError {
+  if (err instanceof TransportError) return err.phase === "connect" || err.phase === "request" || err.phase === "body" || err.phase === "timeout";
+  return err instanceof MeshyApiError && (err.status === 429 || err.status >= 500);
 }
 
 /** Accept only finite, non-negative seconds. NaN/Infinity/negative are usage errors, never "wait forever". */
@@ -80,6 +99,8 @@ export async function pollUntilTerminal(
   let interval = baseInterval;
   const cap = Math.max(baseInterval, 20_000);
   let polls = 0;
+  let failedPolls = 0;
+  let lastError: MeshyApiError | null = null;
   let last: { task: Task; raw: unknown } | null = null;
 
   const done = (timedOut: boolean, aborted: boolean): PollResult => ({
@@ -88,7 +109,19 @@ export async function pollUntilTerminal(
     timedOut,
     polls,
     aborted,
+    failedPolls,
+    lastError,
   });
+
+  /** Sleep until the next tick (the server's hint when it sent one), never past the deadline. */
+  const nextTick = async (hintMs: number | undefined): Promise<"go" | "timeout" | "aborted"> => {
+    const left = deadline - now();
+    if (left <= 0) return "timeout";
+    await sleep(Math.max(1, Math.min(hintMs ?? interval, left)), opts.signal);
+    if (opts.signal?.aborted) return "aborted";
+    interval = Math.min(cap, Math.floor(interval * 1.5));
+    return "go";
+  };
 
   for (;;) {
     const remaining = deadline - now();
@@ -110,7 +143,7 @@ export async function pollUntilTerminal(
       timeoutMs = requestCap;
     }
 
-    let res: { task: Task; raw: unknown };
+    let res: { task: Task; raw: unknown; retryAfterMs?: number };
     try {
       res = await endpoint.retrieveDetailed(taskId, { signal: opts.signal, timeoutMs });
     } catch (err) {
@@ -118,7 +151,13 @@ export async function pollUntilTerminal(
       if (deadlineBound && err instanceof TransportError && (err.phase === "timeout" || err.phase === "aborted")) {
         return done(true, false);
       }
-      throw err;
+      if (single || !isTransientPollError(err)) throw err;
+      failedPolls += 1;
+      lastError = err;
+      opts.onRetry?.(err);
+      const tick = await nextTick(err.retryAfterMs);
+      if (tick !== "go") return done(tick === "timeout", tick === "aborted");
+      continue;
     }
     polls += 1;
     last = res;
@@ -126,10 +165,7 @@ export async function pollUntilTerminal(
     if (isTerminalStatus(res.task.status)) return done(false, false);
     if (opts.signal?.aborted) return done(false, true);
     if (single) return done(true, false);
-    const left = deadline - now();
-    if (left <= 0) return done(true, false);
-    await sleep(Math.max(1, Math.min(interval, left)), opts.signal);
-    if (opts.signal?.aborted) return done(false, true);
-    interval = Math.min(cap, Math.floor(interval * 1.5));
+    const tick = await nextTick(res.retryAfterMs);
+    if (tick !== "go") return done(tick === "timeout", tick === "aborted");
   }
 }

@@ -25,6 +25,8 @@ export interface MediaField {
   many: boolean;
   /** When set, only these file extensions/formats are accepted for local files. */
   formats?: readonly string[];
+  /** Appended to the error when a local file or data: URI is not one of `formats`. */
+  formatsHint?: string;
 }
 
 export interface VerbSupport {
@@ -60,8 +62,21 @@ const ALL_VERBS: VerbSupport = { create: true, get: true, list: true, delete: tr
 
 const image = (path: string, many = false, formats?: readonly string[]): MediaField =>
   formats ? { path, kind: "image", many, formats } : { path, kind: "image", many };
-const model = (path: string, formats?: readonly string[]): MediaField =>
-  formats ? { path, kind: "model", many: false, formats } : { path, kind: "model", many: false };
+const model = (path: string, formats?: readonly string[], formatsHint?: string): MediaField => ({
+  path,
+  kind: "model",
+  many: false,
+  ...(formats ? { formats } : {}),
+  ...(formatsHint ? { formatsHint } : {}),
+});
+
+/**
+ * The printability endpoints take inline (data:) models as glTF only, and a
+ * local file is always sent inline. Other formats need a URL the API can fetch.
+ */
+const PRINT_MODEL_FORMATS = ["glb", "gltf"] as const;
+const PRINT_MODEL_HINT =
+  "the API takes an inline (local) model as glTF only — for .stl/.obj/.fbx pass a public http(s) URL, or --input-task-id";
 
 function v1(id: string, relativePath: string, opts: {
   mediaFields?: readonly MediaField[];
@@ -126,14 +141,14 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
   v1("convert", "/convert", { mediaFields: [model("model_url")], taskTypes: ["convert"], summary: "change file format only" }),
   v1("resize", "/resize", { mediaFields: [model("model_url")], taskTypes: ["resize"], summary: "resize to real-world dimensions" }),
   v1("rigging", "/rigging", { mediaFields: [model("model_url", ["glb"]), image("texture_image_url")], taskTypes: ["rig"], summary: "rig a humanoid mesh (+ bundled walk/run animations)" }),
-  v1("animate", "/animations", { taskTypes: ["animation"], summary: "apply an animation clip to a rigged mesh" }),
+  v1("animate", "/animations", { taskTypes: ["animate"], summary: "apply an animation clip to a rigged mesh" }),
   v1("retexture", "/retexture", { mediaFields: [model("model_url"), image("image_style_url"), image("multiview_image_urls", true)], taskTypes: ["retexture"], summary: "regenerate textures" }),
   v1("text-to-image", "/text-to-image", { taskTypes: ["text-to-image"], summary: "2D image generation" }),
   v1("text-to-motion", "/text-to-motion", { taskTypes: ["text-to-motion"], summary: "generate a standalone skeletal motion clip from text" }),
   v1("image-to-image", "/image-to-image", { mediaFields: [image("reference_image_urls", true)], taskTypes: ["image-to-image"], summary: "2D image editing" }),
   v1("multi-color-print", "/print/multi-color", { mediaFields: [model("model_url")], taskTypes: ["print-multi-color"], summary: "color-separated 3D print output" }),
-  v1("analyze-printability", "/print/analyze", { mediaFields: [model("model_url")], taskTypes: ["print-analyze"], billing: "none", summary: "inspect a model for 3D-printing issues (free)" }),
-  v1("repair-printability", "/print/repair", { mediaFields: [model("model_url")], taskTypes: ["print-repair"], summary: "fix non-watertight / non-manifold geometry" }),
+  v1("analyze-printability", "/print/analyze", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-analyze"], billing: "none", summary: "inspect a model for 3D-printing issues (free)" }),
+  v1("repair-printability", "/print/repair", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-repair"], summary: "fix non-watertight / non-manifold geometry" }),
   v1("uv-unwrap", "/uv-unwrap", { mediaFields: [model("model_url", ["glb"])], taskTypes: ["uv-unwrap"], summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" }),
   creativeLab("figure", "prototype", "Creative Lab figure: photo → styled concept image"),
   creativeLab("figure", "build", "Creative Lab figure: prototype → textured GLB/OBJ/MTL"),
@@ -201,7 +216,7 @@ export const LOCAL_TOOLS: readonly LocalToolDescriptor[] = [
   { id: "mesh.prepare-print", commandPath: ["mesh", "prepare-print"], summary: "OBJ Y-up → Z-up, scale to a target height, centre, bottom at Z=0" },
   { id: "slicer", commandPath: ["slicer"], summary: "detect installed slicers | open a file in one" },
   { id: "doctor", commandPath: ["doctor"], summary: "local environment diagnosis (no network by default)" },
-  { id: "delete", commandPath: ["delete"], summary: "delete any task, whatever its resource" },
+  { id: "delete", commandPath: ["delete"], summary: "delete a task of any resource except Creative Lab (whose own delete verb cancels)" },
 ];
 
 export type ResourceIndexKind = "task" | "query" | "local";

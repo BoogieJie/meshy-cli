@@ -151,6 +151,16 @@ const spec: ResourceCommandSpec = {
         target_formats: ["glb"],
       };
     },
+    validatePayload(payload) {
+      // meshy-t2 has neither knob; v1 answers 400 for either (it does not ignore them).
+      if (payload.model_type === "smart-topology") {
+        for (const [flag, key] of [["--remove-lighting", "remove_lighting"], ["--image-enhancement", "image_enhancement"]] as const) {
+          if (payload[key] !== undefined) {
+            throw new UsageError(`${flag} applies to --model-type standard only (smart-topology runs meshy-t2, which the API refuses it for)`);
+          }
+        }
+      }
+    },
   },
   endpointOf: (c) => c.imageTo3d,
 };

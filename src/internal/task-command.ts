@@ -153,7 +153,7 @@ function taskResult(o: TaskResultOptions): Record<string, unknown> {
   };
 }
 
-function nextCommands(descriptor: TaskResourceDescriptor, taskId: string): Record<string, string> {
+function nextCommands(descriptor: TaskResourceDescriptor, taskId: string): { get: string; wait: string; stream: string } {
   const base = `meshy ${descriptor.commandPath.join(" ")}`;
   return {
     get: `${base} get ${taskId} --output-schema v1`,
@@ -632,19 +632,31 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
     await streamAndReport(opened, runtime, descriptor, endpoint, taskId, timeoutSeconds, idleSeconds, opts);
   });
 
-  // delete
+  // delete — Creative Lab's DELETE cancels instead: the task stays, as CANCELED
+  // (PENDING is refunded, IN_PROGRESS is not, a finished task is refused).
+  const cancels = Boolean(descriptor.creativeLab);
   cmd
     .command("delete <task-id>")
-    .description("Delete a task")
+    .description(
+      cancels
+        ? "Cancel a task: PENDING is refunded, IN_PROGRESS is not; a finished task cannot be canceled (the task is kept as CANCELED, not deleted)"
+        : "Delete a task (a PENDING task is refunded; an IN_PROGRESS one is refused with exit 14 — wait for it first)",
+    )
     .action(async (taskId: string, _opts: Record<string, unknown>, thisCmd: Command) => {
       const opened = openCommand(thisCmd, `${prefix}.delete`, defaultSchema);
       rejectOutputFlagForV1(opened, undefined);
       const runtime = await buildRuntime(opened.flags);
-      const raw = await endpointOf(runtime.client).delete(taskId, { signal: abortSignal() });
+      let raw: unknown;
+      try {
+        raw = await endpointOf(runtime.client).delete(taskId, { signal: abortSignal() });
+      } catch (err) {
+        throw deleteFailure(err, taskId, nextCommands(descriptor, taskId).wait);
+      }
+      const outcome = cancels ? { deleted: false, canceled: true } : { deleted: true };
       await emitResult(
         opened,
-        { resource: spec.name, task_id: taskId, deleted: true },
-        { resource: spec.name, endpoint: descriptor.legacyEndpoint, task_id: taskId, deleted: true, response: raw ?? null },
+        { resource: spec.name, task_id: taskId, ...outcome },
+        { resource: spec.name, endpoint: descriptor.legacyEndpoint, task_id: taskId, ...outcome, response: raw ?? null },
         { legacyFile: opened.flags.output },
       );
     });
@@ -691,6 +703,24 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
   }
 
   return cmd;
+}
+
+/**
+ * A DELETE the server refused because the task is IN_PROGRESS (409): its own
+ * class (`conflict`, exit 14) with the command that waits for a terminal status.
+ */
+export function deleteFailure(err: unknown, taskId: string, waitCommand: string): unknown {
+  if (!(err instanceof MeshyApiError) || err.code !== "conflict") return err;
+  return new CliError({
+    code: "conflict",
+    message: `${err.message} (task ${taskId} was not deleted)`,
+    httpStatus: err.status,
+    recovery: { action: "wait", automatic: false, command: waitCommand },
+    hint: `Wait for a terminal status, then delete again: ${waitCommand}`,
+    details: { path: err.path, body: err.body },
+    result: { task_id: taskId, deleted: false },
+    cause: err,
+  });
 }
 
 /** Strip media payloads before logging. */
@@ -1000,7 +1030,8 @@ async function waitAndReport(
   }
   const elapsed = (performance.now() - started) / 1000;
   const { task, raw, timedOut, aborted } = poll;
-  const waitInfo = { timed_out: timedOut, elapsed_seconds: Number(elapsed.toFixed(2)), polls: poll.polls };
+  const waitInfo = { timed_out: timedOut, elapsed_seconds: Number(elapsed.toFixed(2)), polls: poll.polls, ...retriedPolls(poll) };
+  if (poll.lastError) warnings.push(retriedWarning(poll));
   endProgress(progress, task, timedOut, aborted);
 
   if (aborted) throw interruptedError(descriptor, taskId, task ? { task, raw } : seen.last, submission, opts, opened);
@@ -1013,7 +1044,7 @@ async function waitAndReport(
     }
     throw new CliError({
       code: "timed_out",
-      message: `task ${taskId} did not answer within ${timeoutSeconds}s (no status was received in time); the server keeps running it`,
+      message: `task ${taskId} did not answer within ${timeoutSeconds}s (no status was received in time${poll.lastError ? `; ${poll.failedPolls} status request(s) failed, last: ${poll.lastError.message}` : ""}); the server keeps running it`,
       recovery: { action: "wait", automatic: false, command: nextCommands(descriptor, taskId).wait },
       result: taskResult({ task: null, raw: null, descriptor, includeRaw, submission, extra: { task_id: taskId, wait: waitInfo, next: nextCommands(descriptor, taskId) } }),
       warnings,
@@ -1069,6 +1100,16 @@ async function waitAndReport(
     okEnvelope(opened.command, taskResult({ task, raw, descriptor, includeRaw, submission, downloads, savedJson, extra: { wait: waitInfo, ...projectExtra } }), warnings),
     opened.format,
   );
+}
+
+/** `wait` keys for status requests that failed transiently and were retried (absent when none did). */
+export function retriedPolls(poll: PollResult): Record<string, unknown> {
+  if (!poll.lastError) return {};
+  return { failed_polls: poll.failedPolls, last_poll_error: { message: poll.lastError.message, http_status: poll.lastError.status || null } };
+}
+
+export function retriedWarning(poll: PollResult): Warning {
+  return warning("poll_retried", `${poll.failedPolls} status request(s) failed transiently and were retried at the next poll (last: ${poll.lastError?.message ?? "unknown"})`);
 }
 
 /** Legacy shape for a wait that timed out before any status arrived: still the task id, still exit 8. */

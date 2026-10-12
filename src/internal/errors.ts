@@ -31,6 +31,7 @@ export const EXIT_CODES = {
   LOCAL_IO: 11,
   CHECK_FAILED: 12,
   CHECK_UNKNOWN: 13,
+  CONFLICT: 14,
   INTERRUPTED: 130,
 } as const;
 
@@ -50,6 +51,7 @@ export type CliErrorCode =
   | "local_io"
   | "check_failed"
   | "check_unknown"
+  | "conflict"
   | "interrupted"
   | "protocol"
   | "operation_conflict"
@@ -70,6 +72,7 @@ export const EXIT_FOR_CODE: Record<CliErrorCode, number> = {
   local_io: EXIT_CODES.LOCAL_IO,
   check_failed: EXIT_CODES.CHECK_FAILED,
   check_unknown: EXIT_CODES.CHECK_UNKNOWN,
+  conflict: EXIT_CODES.CONFLICT,
   interrupted: EXIT_CODES.INTERRUPTED,
   protocol: EXIT_CODES.GENERIC,
   operation_conflict: EXIT_CODES.USAGE,
@@ -208,6 +211,8 @@ function hintForApiError(err: MeshyApiError): { hint?: string; docs?: string } {
       };
     case "rate_limit":
       return { hint: "Rate limited. Pause before retrying, or lower request concurrency." };
+    case "conflict":
+      return { hint: "The task is still running. Wait for a terminal status (`meshy <resource> wait <task-id>`), then try again." };
     default:
       return {};
   }
@@ -250,6 +255,7 @@ export function exitCodeFor(err: unknown): number {
       case "rate_limit": return EXIT_CODES.RATE_LIMIT;
       case "network": return EXIT_CODES.NETWORK;
       case "credit": return EXIT_CODES.CREDIT;
+      case "conflict": return EXIT_CODES.CONFLICT;
       case "server": return EXIT_CODES.GENERIC;
     }
   }
@@ -297,7 +303,7 @@ export function classifyError(err: unknown): ClassifiedError {
     const recovery: ErrorRecovery | null =
       err.code === "auth"
         ? { action: "login", automatic: false, command: "meshy auth login" }
-        : err.code === "rate_limit"
+        : err.code === "rate_limit" || err.code === "conflict"
           ? { action: "wait", automatic: false }
           : err.code === "credit"
             ? { action: "top_up", automatic: false, command: "meshy balance" }

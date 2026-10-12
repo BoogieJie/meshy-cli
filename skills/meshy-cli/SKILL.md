@@ -80,7 +80,7 @@ meshy <resource> list [--page-size <n>] --output-schema v1
   is refused a replay (`credential_unverified`) — run `meshy auth login` once first.
 - **An error after `create` was accepted still names the task**: read
   `result.task_id` / `result.submission.task_id` and `result.next` from any
-  non-zero exit (11 local I/O, 1 polling failure, 130 interrupt) before deciding
+  non-zero exit (11 local I/O, 8 timeout, 130 interrupt) before deciding
   anything; never create again because a later step failed.
 - `--save-json <file>` stores the raw API task (use it as the input of `download`,
   `inspect faces` and `project record`); `--include-raw` puts the raw response under
@@ -144,7 +144,11 @@ These are API rules, not preferences — ignoring them produces failed tasks:
 - **`text-to-motion` produces a standalone skeletal clip**, not an animated
   character. Pass a 2–10 second duration in 0.5-second increments.
 - **`repair-printability` drops textures and invalidates UVs.** Run it before
-  texturing, or re-`retexture` afterwards.
+  texturing, or re-`retexture` afterwards. Both printability commands take a
+  local model as `.glb`/`.gltf` only; pass `.stl`/`.obj`/`.fbx` as an http(s)
+  URL, or use `--input-task-id`.
+- **`meshy delete <id>` never reaches Creative Lab tasks**; `meshy creative-lab
+  <product> <stage> delete <id>` cancels one instead (`canceled: true`).
 - **`uv-unwrap` takes one source** (`--input-task-id` or `--model-url`, GLB only).
 - **`multi-image-to-3d` is beta**; use `image-to-3d` unless multi-view input was
   explicitly asked for. Its default runs a two-stage multi-view model;
@@ -177,11 +181,15 @@ Exit codes: `0` ok · `1` task FAILED/CANCELED while waiting, or unclassified ·
 `2` usage · `3` auth · `4` validation · `5` not found · `6` rate limit ·
 `7` network · `8` timed out (task keeps running) · `9` out of credits ·
 `10` submission unknown (do not re-create) · `11` local I/O · `12` check failed ·
-`13` check unknown · `130` interrupted.
+`13` check unknown · `14` conflict (delete of an IN_PROGRESS task) · `130` interrupted.
 
 - Exit 9 → run `meshy balance`, relay the number, do not retry.
 - Exit 6 → back off; the CLI does not retry for you.
-- Exit 8 → `wait`/`stream` the same task id again; it was not cancelled.
+- Exit 8 → `wait`/`stream` the same task id again; it was not cancelled. A
+  429/5xx/timeout on a status request is already retried while waiting; the
+  default `--timeout` is 600 s, the API advises waiting up to 60 min.
+- Exit 14 → the task is still running; run `error.recovery.command` (`wait`),
+  then delete again.
 - Exit 130 after `-o` → the transfer (or the material rewrite) was cancelled;
   `result.downloads.files` lists what already landed (`status: written`), the rest can
   be fetched with `meshy download`. `downloads.failed_step` (`relink` | `digest` |

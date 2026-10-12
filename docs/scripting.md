@@ -80,7 +80,11 @@ one JSON document (`ndjson` streams emit one line per event plus a final
   that also bounds every in-flight GET: a response arriving after the deadline
   is a timeout (exit 8, last status kept, `result.task` null when none arrived
   in time), never a late success, and no request starts once the budget is
-  spent. `stream` follows Server-Sent Events with `--timeout` (total) and
+  spent. Between ticks it sleeps the server's `Retry-After` when one is sent;
+  a status request that fails with a `429`, a `5xx`, a read timeout or a
+  dropped connection is retried at the next tick (`result.wait.failed_polls`,
+  `last_poll_error` and a `poll_retried` warning say so), while a `401`/`404`
+  or a malformed task ends the wait at once. `stream` follows Server-Sent Events with `--timeout` (total) and
   `--idle-timeout` (silence, keep-alives reset it); `-o` downloads the assets
   in every output format, and in `ndjson` the final `outcome` line carries the
   download manifest.
@@ -119,6 +123,7 @@ one JSON document (`ndjson` streams emit one line per event plus a final
 | 11 | local I/O — refused overwrite, path outside the authorised root, journal/project write failure |
 | 12 | check failed (`inspect faces` over the limit) |
 | 13 | check unknown (`inspect faces` without a usable face count) |
+| 14 | conflict (`409`: `delete` of an IN_PROGRESS task — wait for a terminal status first) |
 | 130 | interrupted (Ctrl-C); nothing was deleted server-side |
 
 ## Agent skill

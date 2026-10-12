@@ -10,7 +10,7 @@
  * is what --save-json, --include-raw and the v1 TaskView are built from.
  */
 
-import { MeshyApiError } from "../errors.js";
+import { MeshyApiError, parseRetryAfter } from "../errors.js";
 import type { Transport, StreamHandle } from "../transport.js";
 import {
   TaskCreateResponseSchema,
@@ -36,6 +36,8 @@ export interface CreateResult {
 export interface RetrieveResult {
   task: Task;
   raw: unknown;
+  /** The server's poll hint (`Retry-After` on a task read), in ms, when it sent one. */
+  retryAfterMs?: number;
 }
 
 export interface ListResult {
@@ -106,7 +108,8 @@ export class TaskEndpoint {
         body: resp.json,
       });
     }
-    return { task: parsed.data, raw: resp.json };
+    const retryAfterMs = parseRetryAfter(resp.headers.get("retry-after"));
+    return retryAfterMs === undefined ? { task: parsed.data, raw: resp.json } : { task: parsed.data, raw: resp.json, retryAfterMs };
   }
 
   async list(params: ListParams = {}, extras: RequestExtras = {}): Promise<Task[]> {

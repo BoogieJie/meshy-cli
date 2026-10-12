@@ -165,7 +165,9 @@ test("pollUntilTerminal — deterministic: a timer that wakes late never polls a
   assert.equal(out.timedOut, true);
   assert.equal(out.task, null);
   assert.equal(out.polls, 0);
-  // A read-timeout-bound failure (budget still left) is a network error, not a timeout.
+  // A read-timeout-bound failure (budget still left) says nothing about the
+  // task: it is retried at the next tick (docs: task-lifecycle), and only the
+  // deadline ends the wait — with the failure kept.
   const readCap = fakeClock();
   const readEp = {
     async retrieveDetailed(_id: string, extras?: { timeoutMs?: number }): Promise<{ task: Task; raw: unknown }> {
@@ -173,7 +175,18 @@ test("pollUntilTerminal — deterministic: a timer that wakes late never polls a
       throw new TransportError({ message: "request timed out", phase: "timeout", path: "/x" });
     },
   } as unknown as TaskEndpoint;
-  await assert.rejects(pollUntilTerminal(readEp, "abc", { timeoutSeconds: 10, intervalMs: 300, requestTimeoutMs: 50, now: readCap.now, sleep: readCap.sleep }), TransportError);
+  const retried = await pollUntilTerminal(readEp, "abc", { timeoutSeconds: 10, intervalMs: 300, requestTimeoutMs: 50, now: readCap.now, sleep: readCap.sleep });
+  assert.equal(retried.timedOut, true);
+  assert.equal(retried.task, null);
+  assert.ok(retried.failedPolls > 1);
+  assert.ok(retried.lastError instanceof TransportError);
+  // A non-transient failure (a refused redirect, a 404) still ends it at once.
+  const redirectEp = {
+    async retrieveDetailed(): Promise<{ task: Task; raw: unknown }> {
+      throw new TransportError({ message: "refusing redirect", phase: "response", path: "/x" });
+    },
+  } as unknown as TaskEndpoint;
+  await assert.rejects(pollUntilTerminal(redirectEp, "abc", { timeoutSeconds: 10, intervalMs: 300, now: readCap.now, sleep: readCap.sleep }), TransportError);
 });
 
 test("pollUntilTerminal — real timers (smoke): no GET starts after the deadline, whatever the timer jitter", async () => {

@@ -40,7 +40,7 @@ export const RESOURCES: ResourceEntry[] = [
   { name: "analyze-printability", summary: "inspect a model for 3D-printing issues (free)" },
   { name: "repair-printability", summary: "fix non-watertight / non-manifold geometry" },
   { name: "balance", summary: "remaining credit balance" },
-  { name: "delete", summary: "delete any task, whatever its resource" },
+  { name: "delete", summary: "delete a task of any resource except Creative Lab (whose own delete verb cancels)" },
   // Added in S1 (appended so 0.2.0 consumers keep their positions).
   { name: "uv-unwrap", summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" },
   { name: "creative-lab", summary: "photo → printable product: figure | lamp | keychain | fridge-magnet (prototype then build)" },
