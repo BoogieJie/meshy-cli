@@ -994,3 +994,28 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
 - The API reports animation tasks as `type: "animate"`; the registry said
   `"animation"`, so `download --task-json` could not match a saved animation
   task to its resource.
+
+## D-073 The animation catalog is the documented library endpoint
+
+- `animation-catalog list` now calls `GET /openapi/v1/animations/library`, the
+  endpoint the API docs publish for this purpose: free, authenticated, a
+  complete list, with server-side `search` (name or key), exact `category` and
+  `sub_category`, and `action_ids` lookups. D-008's local search is gone, and
+  so is the anonymous transport it needed.
+- Items are passed through as the API returns them (`action_id`, `name`, `key`,
+  `category`, `sub_category`, `preview_url`); `rig_type`, `is_default` and
+  `is_free` are no longer reported, because the public endpoint does not
+  return them. `result.search_scope` is `"server"`; `fetched`, `total` and
+  `authenticated` are dropped.
+- The command now needs a credential and is no longer a local command for the
+  update check.
+
+## D-074 Auto Split and Usage are v1-only commands
+
+- `auto-split` is a task resource on `/print/split` with the full verb set;
+  `usage tasks` is a one-page query on `/usage/tasks`. Both are new, so both
+  speak only the v1 envelope (as D-002 did for the S1 commands).
+- Auto Split's connector tuning without `--connectors true` is refused rather
+  than sent to be ignored, and `by_parts` / `by_color` without a prompt fail
+  before the request. Thin-wall reinforcement after a cut is always on in the
+  API and has no flag.

@@ -53,7 +53,7 @@ test("every documented task resource exists in the registry with the same routin
   }
 });
 
-test("query resources agree with the documentation and the catalog carries no credential", () => {
+test("query resources agree with the documentation", () => {
   for (const d of docs.query_resources) {
     const q = QUERY_RESOURCES.find((x) => x.id === d.id);
     assert.ok(q, `registry is missing query ${d.id}`);
@@ -62,7 +62,7 @@ test("query resources agree with the documentation and the catalog carries no cr
     assert.equal(q.relativePath, d.relativePath);
     assert.equal(q.auth, d.auth);
   }
-  assert.equal(QUERY_RESOURCES.find((q) => q.id === "animation-catalog")?.auth, "none");
+  assert.equal(QUERY_RESOURCES.find((q) => q.id === "animation-catalog")?.relativePath, "/animations/library");
   assert.equal(QUERY_RESOURCES.find((q) => q.id === "showcases")?.billing, "may-charge");
 });
 

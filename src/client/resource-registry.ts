@@ -1,8 +1,8 @@
 /**
  * Resource registry — the single source for what the CLI can call.
  *
- * Every task resource (the 16 first-class endpoints plus the 4 × 2 Creative
- * Lab stages) is described once: command path, API family, relative path,
+ * Every task resource (the first-class endpoints plus the Creative Lab
+ * stages) is described once: command path, API family, relative path,
  * supported verbs, billing class and the payload fields that carry media.
  * Commands, the `resources` index, payload normalisation and the transport
  * all read from here; nothing else hard-codes a path.
@@ -149,6 +149,7 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
   v1("multi-color-print", "/print/multi-color", { mediaFields: [model("model_url")], taskTypes: ["print-multi-color"], summary: "color-separated 3D print output" }),
   v1("analyze-printability", "/print/analyze", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-analyze"], billing: "none", summary: "inspect a model for 3D-printing issues (free)" }),
   v1("repair-printability", "/print/repair", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-repair"], summary: "fix non-watertight / non-manifold geometry" }),
+  v1("auto-split", "/print/split", { taskTypes: ["print-split"], summary: "split a model into printable parts (auto / by named parts / by colour; optional connectors)" }),
   v1("uv-unwrap", "/uv-unwrap", { mediaFields: [model("model_url", ["glb"])], taskTypes: ["uv-unwrap"], summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" }),
   creativeLab("figure", "prototype", "Creative Lab figure: photo → styled concept image"),
   creativeLab("figure", "build", "Creative Lab figure: prototype → textured GLB/OBJ/MTL"),
@@ -189,17 +190,18 @@ export const TOP_LEVEL_TASK_RESOURCE_IDS: readonly string[] = TASK_RESOURCES.fil
 export interface QueryResourceDescriptor {
   id: string;
   commandPath: readonly string[];
-  base: "v1" | "public-web";
+  base: "v1";
   method: "GET";
   relativePath: string;
-  auth: "bearer" | "none";
+  auth: "bearer";
   billing: Billing;
   summary: string;
 }
 
 export const QUERY_RESOURCES: readonly QueryResourceDescriptor[] = [
   { id: "balance", commandPath: ["balance"], base: "v1", method: "GET", relativePath: "/balance", auth: "bearer", billing: "none", summary: "remaining credit balance" },
-  { id: "animation-catalog", commandPath: ["animation-catalog", "list"], base: "public-web", method: "GET", relativePath: "/animations/resources", auth: "none", billing: "none", summary: "public animation library (action ids); no key needed" },
+  { id: "animation-catalog", commandPath: ["animation-catalog", "list"], base: "v1", method: "GET", relativePath: "/animations/library", auth: "bearer", billing: "none", summary: "animation library (action ids for animate); free, server-side search" },
+  { id: "usage", commandPath: ["usage", "tasks"], base: "v1", method: "GET", relativePath: "/usage/tasks", auth: "bearer", billing: "none", summary: "finished API tasks with the credits each consumed (Studio/Enterprise)" },
   { id: "showcases", commandPath: ["showcases", "list"], base: "v1", method: "GET", relativePath: "/showcases", auth: "bearer", billing: "may-charge", summary: "Enterprise community showcases (every request is billed)" },
 ];
 
@@ -249,7 +251,7 @@ export function resourceIndex(): ResourceIndexEntry[] {
     kind: "query",
     command: `meshy ${q.commandPath.join(" ")}`,
     summary: q.summary,
-    endpoint: q.base === "public-web" ? `/web/public${q.relativePath}` : `/openapi/v1${q.relativePath}`,
+    endpoint: `/openapi/v1${q.relativePath}`,
     verbs: null,
   }));
   const locals: ResourceIndexEntry[] = LOCAL_TOOLS.map((l) => ({

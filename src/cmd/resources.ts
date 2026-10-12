@@ -44,7 +44,7 @@ export const RESOURCES: ResourceEntry[] = [
   // Added in S1 (appended so 0.2.0 consumers keep their positions).
   { name: "uv-unwrap", summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" },
   { name: "creative-lab", summary: "photo → printable product: figure | lamp | keychain | fridge-magnet (prototype then build)" },
-  { name: "animation-catalog", summary: "public animation library (action ids); no key needed" },
+  { name: "animation-catalog", summary: "animation library (action ids for animate); free, server-side search" },
   { name: "showcases", summary: "Enterprise community showcases (every request is billed)" },
   { name: "download", summary: "download selected assets of a task (saved task JSON, URL, or API)" },
   { name: "project", summary: "meshy_output project folders: init | record | show | list | rebuild-index" },
@@ -52,6 +52,8 @@ export const RESOURCES: ResourceEntry[] = [
   { name: "mesh", summary: "prepare-print: OBJ Y-up → Z-up, scale to height, centre, ground at Z=0" },
   { name: "slicer", summary: "detect installed slicers | open a model in one" },
   { name: "doctor", summary: "local environment diagnosis (no network by default)" },
+  { name: "auto-split", summary: "split a model into printable parts (auto / by named parts / by colour; optional connectors)" },
+  { name: "usage", summary: "usage tasks: finished API tasks with the credits each consumed (Studio/Enterprise)" },
 ];
 
 const VERBS = `Every task resource carries the same verbs:

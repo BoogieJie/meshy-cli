@@ -96,7 +96,9 @@ meshy <resource> list [--page-size <n>] --output-schema v1
 meshy uv-unwrap create --input-task-id <id> --async --output-schema v1              # GLB only, ≤40k faces (server enforces)
 meshy creative-lab <figure|lamp|keychain|fridge-magnet> prototype create --image-url ./photo.png --name demo --async --output-schema v1
 meshy creative-lab <product> build create --input-task-id <prototype-id> [--model-format …] [--options '<json>'] --async --output-schema v1
-meshy animation-catalog list --category DailyActions --search wave --output-schema v1   # public, no key; search is local
+meshy animation-catalog list --category DailyActions --search wave --output-schema v1   # free; search is server-side
+meshy auto-split create --input-task-id <id> --mode by_parts --prompt "head, torso" --async --output-schema v1   # printable parts
+meshy usage tasks --start-time 2026-08-01T00:00:00Z --output-schema v1                 # Studio/Enterprise; credits per task
 meshy showcases list --search car --page-size 3 --output-schema v1                      # Enterprise only; EVERY request is billed
 ```
 
@@ -139,8 +141,10 @@ These are API rules, not preferences — ignoring them produces failed tasks:
   not props, quadrupeds or untextured drafts. Too dense? `remesh` first. A
   successful rigging task already bundles walking and running clips
   (`result.basic_animations.*`), so check its result before calling `animate`.
-- **`animate` takes a rigging task id**, not a model task id, plus an integer
-  `--action-id` from the catalog.
+- **`animate` takes a rigging task id**, not a model task id, plus exactly one
+  of: an integer `--action-id` from the catalog, `--action-ids` (up to 10, one
+  file with one clip each, billed per action) or a text-to-motion
+  `--motion-task-id` (biped rigs).
 - **`text-to-motion` produces a standalone skeletal clip**, not an animated
   character. Pass a 2–10 second duration in 0.5-second increments.
 - **`repair-printability` drops textures and invalidates UVs.** Run it before
@@ -166,10 +170,11 @@ These are API rules, not preferences — ignoring them produces failed tasks:
 
 ## Finding an animation id
 
-`--action-id` is an integer from Meshy's animation library. Ask the live public
-catalog (no key): `meshy animation-catalog list --category Fighting --search kick
---output-schema v1` → `result.items[].action_id`. Ids are not `1..N` (the catalog
-contains `-2`, `-1` and `0`) — never guess one. This skill also bundles a
+`--action-id` is an integer from Meshy's animation library. Ask the live
+library (free): `meshy animation-catalog list --category Fighting --search kick
+--output-schema v1` → `result.items[].action_id`; `--action-ids 92,4` checks
+stored ids. Ids are not `1..N` (the catalog contains `-2`, `-1` and `0`) — never
+guess one. This skill also bundles a
 snapshot as `animation-library.json` (with hand-written descriptions the API does
 not return; it can lag behind the live catalog).
 

@@ -129,8 +129,16 @@ meshy creative-lab figure prototype create --image-url ./photo.png --name demo -
 meshy creative-lab figure build create --input-task-id <prototype-id> --async
 meshy creative-lab lamp build create --input-task-id <id> --model-format zip --options '{"diameter_mm":180}'
 
-# public animation catalog (no key) and Enterprise showcases (billed per request)
+# animation library (free; server-side search), several clips in one file, a text-to-motion clip
 meshy animation-catalog list --category DailyActions --search wave
+meshy animate create --rig-task-id <rig-id> --action-ids 10,25,92
+meshy animate create --rig-task-id <rig-id> --motion-task-id <text-to-motion-id>
+
+# split a model into printable parts; usage records (Studio/Enterprise)
+meshy auto-split create --input-task-id <id> --mode by_parts --prompt "head, torso, legs" --connectors true
+meshy usage tasks --start-time 2026-08-01T00:00:00Z --endpoints image-to-3d --page-size 100
+
+# Enterprise showcases (billed per request)
 meshy showcases list --search car --page-size 3 --model-format glb
 
 # local helpers (no key, no network)
@@ -199,7 +207,7 @@ local commands with their kind.
 | `resize` | `/resize` | [docs](https://docs.meshy.ai/en/api/resize) |
 | `uv-unwrap` | `/uv-unwrap` | [docs](https://docs.meshy.ai/en/api/uv-unwrap) |
 | `rigging` | `/rigging` | [docs](https://docs.meshy.ai/en/api/rigging) |
-| `animate` | `/animations` | [docs](https://docs.meshy.ai/en/api/animations) |
+| `animate` | `/animations` | [docs](https://docs.meshy.ai/en/api/animation) |
 | `text-to-motion` | `/text-to-motion` | [docs](https://docs.meshy.ai/en/api/text-to-motion) |
 | `retexture` | `/retexture` | [docs](https://docs.meshy.ai/en/api/retexture) |
 | `text-to-image` | `/text-to-image` | [docs](https://docs.meshy.ai/en/api/text-to-image) |
@@ -207,8 +215,10 @@ local commands with their kind.
 | `multi-color-print` | `/print/multi-color` | [docs](https://docs.meshy.ai/en/api/multi-color-print) |
 | `analyze-printability` | `/print/analyze` | [docs](https://docs.meshy.ai/en/api/analyze-printability) |
 | `repair-printability` | `/print/repair` | [docs](https://docs.meshy.ai/en/api/repair-printability) |
+| `auto-split` | `/print/split` | [docs](https://docs.meshy.ai/en/api/auto-split) |
 | `creative-lab <product> prototype\|build` | `/openapi/creative-lab/<product>/v1/<stage>` | [figure](https://docs.meshy.ai/en/api/creative-lab-figure) · [lamp](https://docs.meshy.ai/en/api/creative-lab-lamp) · [keychain](https://docs.meshy.ai/en/api/creative-lab-keychain) · [fridge-magnet](https://docs.meshy.ai/en/api/creative-lab-fridge-magnet) |
-| `animation-catalog list` | `GET /web/public/animations/resources` (no key) | [docs](https://docs.meshy.ai/en/api/animations) |
+| `animation-catalog list` | `GET /animations/library` (free) | [docs](https://docs.meshy.ai/en/api/animation#list-animations) |
+| `usage tasks` | `GET /usage/tasks` (Studio/Enterprise; free) | [docs](https://docs.meshy.ai/en/api/usage) |
 | `showcases list` | `GET /showcases` (Enterprise; every request is billed) | [docs](https://docs.meshy.ai/en/api/enterprise-api) |
 
 Per-resource actions (all single-HTTP-call except `wait`/`stream`):

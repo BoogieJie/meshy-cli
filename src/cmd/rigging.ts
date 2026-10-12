@@ -1,6 +1,5 @@
 /**
  * rigging — https://docs.meshy.ai/en/api/rigging
- * Note: Meshy does not expose a list endpoint for rigging.
  */
 
 import { parseNumber } from "../internal/flags.js";
@@ -14,7 +13,6 @@ const spec: ResourceCommandSpec = {
     "character as GLB + FBX plus bundled walking and running animations at no extra cost. " +
     "Input must be GLB with under 300k faces — remesh to ~10000 first if denser. Not suitable " +
     "for non-humanoid assets or models with unclear limb structure",
-  supportsList: false,
   create: {
     description: "Create a rigging task",
     configure(cmd) {

@@ -7,6 +7,7 @@
  */
 
 import { Command } from "commander";
+import { MeshyApiError } from "../client/errors.js";
 import { dirname, resolve as resolvePath } from "node:path";
 import { beginCommand, type CommandContext } from "./context.js";
 import { UsageError, type Warning } from "./errors.js";
@@ -85,4 +86,12 @@ export function saveRawJson(
   const text = `${JSON.stringify(raw, null, 2)}\n`;
   writeJsonFile(resolved.path, raw, { overwrite: opts.overwrite ?? false });
   return { path: resolved.path, bytes: Buffer.byteLength(text, "utf8") };
+}
+
+/** A list endpoint's body as its object items; anything but a JSON array is an unexpected shape. */
+export function listItems(raw: unknown, path: string): Record<string, unknown>[] {
+  if (!Array.isArray(raw)) {
+    throw new MeshyApiError({ message: `unexpected response shape from GET ${path}: expected a JSON array`, status: 200, code: "server", path, body: raw });
+  }
+  return raw.filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x));
 }
