@@ -5,12 +5,11 @@
  * `--mode refine --preview-task-id <id>` textures it.
  *
  * The flag surface is deliberately minimal: topology and polycount are
- * remesh's job, resizing is resize's job, deprecated parameters
- * (symmetry_mode, lowpoly) are gone, and there is no model choice — the
- * server default "latest" applies. Unlike the image-driven endpoints, this
- * one has no meshy-7: its model set is meshy-5 / meshy-6 / latest, and
- * "latest" is still Meshy 6. The `--data` escape hatch still reaches
- * anything the API accepts.
+ * remesh's job (except smart topology's native polycount), resizing is
+ * resize's job, deprecated parameters (symmetry_mode, lowpoly, ultra_mode)
+ * are gone, and there is no model flag — the mode is the model: standard runs
+ * the server default "latest" (Meshy 7.1), smart-topology runs meshy-t2. The
+ * `--data` escape hatch still reaches anything the API accepts.
  */
 
 import { Option } from "commander";
@@ -28,7 +27,7 @@ const spec: ResourceCommandSpec = {
     configure(cmd) {
       return cmd
         .addOption(new Option("--mode <mode>", "preview | refine").choices(["preview", "refine"]))
-        .option("--prompt <text>", "required in preview mode; max 600 chars")
+        .option("--prompt <text>", "required in preview mode; max 800 chars")
         .option(
           "--preview-task-id <id>",
           "required in refine mode. Must be a SUCCEEDED text-to-3d preview task — refine " +
@@ -56,10 +55,10 @@ const spec: ResourceCommandSpec = {
         )
         .option(
           "--enable-pbr <bool>",
-          "refine only. Generate normal/metallic/roughness/emission maps (default: true, so game-engine imports carry the full map set)",
+          "refine only. Generate normal/metallic/roughness maps, plus an emission map on meshy-6 below 8k (default: true, so game-engine imports carry the full map set)",
           parseBool,
         )
-        .option("--texture-prompt <text>", "refine only. Extra texture guidance (max 600 chars)")
+        .option("--texture-prompt <text>", "refine only. Extra texture guidance (max 800 chars)")
         .addOption(
           new Option(
             "--texture-resolution <res>",

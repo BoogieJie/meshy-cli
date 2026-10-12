@@ -94,7 +94,7 @@ export const makeCommand = new Command("make")
       "run the first step to completion, then return the resume plan instead of continuing",
     ).default(false),
   )
-  .addOption(new Option("--timeout <seconds>", "max seconds to poll each step").default("600"))
+  .addOption(new Option("--timeout <seconds>", "max seconds to poll each step; the task keeps running after it (resume with the printed command)").default("600"))
   .action(async (input: string, opts: MakeOptions, thisCmd: Command) => {
     const opened = openCommand(thisCmd, "make", "legacy");
     if (opts.async && opts.stopAfterFirst) {

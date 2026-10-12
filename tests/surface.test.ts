@@ -208,3 +208,16 @@ test("generation commands default target_formats to glb instead of every format"
     assert.match(flag?.description ?? "", /default: glb/, resource);
   }
 });
+
+test("help text matches the current API: 800-character prompts, Meshy 7.1 default, emission only on meshy-6, fresh UVs by default", () => {
+  const help = (resource: string, flag: string) => sub(sub(root, resource), "create").options.find((o) => o.long === flag)?.description ?? "";
+  assert.match(help("text-to-3d", "--prompt"), /max 800 chars/);
+  for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d"]) {
+    assert.match(help(resource, "--texture-prompt"), /max 800 chars/, resource);
+  }
+  for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d", "retexture"]) {
+    assert.match(help(resource, "--enable-pbr"), /emission map on meshy-6/, resource);
+  }
+  assert.match(help("image-to-3d", "--model-type"), /meshy-7\.1/);
+  assert.match(help("retexture", "--enable-original-uv"), /default: false/);
+});

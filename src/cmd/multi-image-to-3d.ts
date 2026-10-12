@@ -52,10 +52,10 @@ const spec: ResourceCommandSpec = {
         )
         .option(
           "--enable-pbr <bool>",
-          "generate normal/metallic/roughness/emission maps (default: true, so game-engine imports carry the full map set)",
+          "generate normal/metallic/roughness maps, plus an emission map on meshy-6 below 8k (default: true, so game-engine imports carry the full map set)",
           parseBool,
         )
-        .option("--texture-prompt <text>", "text guidance for texturing (max 600 chars)")
+        .option("--texture-prompt <text>", "text guidance for texturing (max 800 chars)")
         .option(
           "--texture-image-urls <csv>",
           "1-4 views of the same object to guide texturing, front first; URLs or local files; independent of --image-urls. Exclusive with --texture-prompt",

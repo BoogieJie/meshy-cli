@@ -2,14 +2,15 @@
  * image-to-3d — https://docs.meshy.ai/en/api/image-to-3d
  *
  * The mode IS the model — there is no model flag:
- *   - standard → meshy-7 (server default "latest") — full-detail generation;
- *     polycount is remesh's job afterwards.
+ *   - standard → meshy-7.1 (server default "latest") — full-detail
+ *     generation; polycount is remesh's job afterwards.
  *   - smart-topology → meshy-t2 (server default) — component-aware low-poly
  *     with a native --target-polycount; the budget pick for game-ready
  *     geometry.
  *
- * --ultra-mode rides on standard only: the API gates ultra_mode on meshy-7,
- * so pairing it with smart-topology is rejected here rather than on the wire.
+ * The Ultra geometry pass (--geometry-resolution 2k|4k, or the deprecated
+ * --ultra-mode) rides on standard only: it needs meshy-7.1, so pairing it with
+ * smart-topology is rejected here rather than on the wire.
  */
 
 import { Option } from "commander";
@@ -37,7 +38,7 @@ const spec: ResourceCommandSpec = {
         .addOption(
           new Option(
             "--model-type <kind>",
-            "standard (default; meshy-7 full-detail generation) | smart-topology (meshy-t2 component-aware low-poly: clean topology, separated parts)",
+            "standard (default; meshy-7.1 full-detail generation) | smart-topology (meshy-t2 component-aware low-poly: clean topology, separated parts)",
           ).choices(["standard", "smart-topology"]),
         )
         .option(
@@ -63,10 +64,10 @@ const spec: ResourceCommandSpec = {
         )
         .option(
           "--enable-pbr <bool>",
-          "generate normal/metallic/roughness/emission maps (default: true, so game-engine imports carry the full map set)",
+          "generate normal/metallic/roughness maps, plus an emission map on meshy-6 below 8k (default: true, so game-engine imports carry the full map set)",
           parseBool,
         )
-        .option("--texture-prompt <text>", "text guidance for texturing (max 600 chars)")
+        .option("--texture-prompt <text>", "text guidance for texturing (max 800 chars)")
         .addOption(
           new Option(
             "--texture-resolution <res>",
@@ -150,10 +151,10 @@ const spec: ResourceCommandSpec = {
       // texturing is its own step, and the API rejects texture knobs on
       // untextured runs, so they ride only when texturing is on — then the
       // game-ready defaults apply: full PBR map set, 4k base color. The
-      // model is not a choice — it follows the mode (standard → meshy-7,
+      // model is not a choice — it follows the mode (standard → meshy-7.1,
       // smart-topology → meshy-t2, both server defaults). Smart topology
-      // gets the rigging-friendly 10k polycount. ultra_mode stays off unless
-      // asked for: it bills extra. GLB-only output — omitting target_formats
+      // gets the rigging-friendly 10k polycount. The Ultra pass stays off
+      // unless asked for: it bills extra. GLB-only output — omitting target_formats
       // makes the API produce every format.
       const texturing = opts.shouldTexture === true;
       return {

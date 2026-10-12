@@ -490,7 +490,7 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
         "submit once and return the task id immediately (no polling); query later with `get`, `wait` or `stream`",
       ).default(false),
     )
-    .addOption(new Option("--timeout <seconds>", "max seconds to poll in sync mode").default("600"))
+    .addOption(new Option("--timeout <seconds>", "max seconds to poll in sync mode; the task keeps running after it (resume with `wait`; the API advises allowing up to 60 min)").default("600"))
     .addOption(
       new Option(
         "--operation-id <id>",
@@ -603,7 +603,7 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
     cmd
       .command("wait <task-id>")
       .description("Poll until the task reaches a terminal status")
-      .option("--timeout <seconds>", "max seconds to wait (0 = a single query)", "600"),
+      .option("--timeout <seconds>", "max seconds to wait (0 = a single query); the task keeps running after it — the API advises allowing up to 60 min", "600"),
   ).action(async (taskId: string, opts: Record<string, unknown>, thisCmd: Command) => {
     const opened = openCommand(thisCmd, `${prefix}.wait`, defaultSchema);
     beginProjectContext(opts, opened);

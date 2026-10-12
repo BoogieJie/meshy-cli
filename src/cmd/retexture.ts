@@ -40,10 +40,10 @@ const spec: ResourceCommandSpec = {
           "1-4 views of the SAME object as CSV, first entry is the front reference; each is a URL or local file path. Mutually exclusive with the two style flags",
           parseCsv,
         )
-        .option("--enable-original-uv <bool>", "reuse the model's original UVs (default: true)", parseBool)
+        .option("--enable-original-uv <bool>", "keep the model's existing UV layout — true suits Meshy outputs and models with good UVs (default: false, fresh UVs)", parseBool)
         .option(
           "--enable-pbr <bool>",
-          "generate normal/metallic/roughness/emission maps (default: true, so game-engine imports carry the full map set)",
+          "generate normal/metallic/roughness maps, plus an emission map on meshy-6 below 8k (default: true, so game-engine imports carry the full map set)",
           parseBool,
         )
         .addOption(
