@@ -31,7 +31,7 @@ meshy-cli --api-key msy_... balance             # or per-call
 meshy balance --api-key-file ./keys.env         # dotenv-style file; only MESHY_API_KEY is read
 ```
 
-Get a key at <https://www.meshy.ai/settings/api>.
+Get a key at <https://www.meshy.ai/developers/keys>.
 
 **Resolution order:** `--api-key` › `MESHY_API_KEY` › `--api-key-file` › the active stored profile.
 The environment variable stays ahead of the stored credential on purpose, so a
@@ -111,6 +111,11 @@ meshy-cli text-to-motion create --prompt "a character waving" --duration 3
 
 # smart topology: component-aware low-poly with a native polycount
 meshy-cli image-to-3d create --image-url cat.png --model-type smart-topology --target-polycount 10000
+
+# multi-view → 3D: the default is a two-stage multi-view model; 2k turns on the
+# multi-view Ultra pass (+5 credits), the web app's Ultra 2K geometry setting;
+# the Ultra model follows ai_model, so pin Meshy 7.1 through --data
+meshy-cli multi-image-to-3d create --image-urls front.png,side.png,back.png --geometry-resolution 2k --data '{"ai_model":"meshy-7.1"}'
 
 # fire-and-forget (--async): exactly one POST, returns the task_id, query later
 TASK=$(meshy-cli text-to-image create --prompt "mountain landscape" --async --output-schema v1 | jq -r .result.submission.task_id)
