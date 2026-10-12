@@ -14,7 +14,12 @@ import {
 } from "../src/internal/image-models.js";
 import { UsageError } from "../src/internal/errors.js";
 
-const NANO_BANANA_MODELS = ["nano-banana-2", "nano-banana-2-lite", "nano-banana-pro"];
+const NANO_BANANA_MODELS = [
+  "nano-banana-2-1",
+  "nano-banana-2",
+  "nano-banana-2-lite",
+  "nano-banana-pro",
+];
 
 test("gpt-image-2 is the default model and part of the model list", () => {
   assert.equal(DEFAULT_IMAGE_MODEL, "gpt-image-2");
@@ -79,7 +84,8 @@ test("checkImageCombo — unknown model (driven via --data) defers the ratio che
   assert.throws(() => checkImageCombo({ aspectRatio: "16:9", generateMultiView: true }), UsageError);
 });
 
-test("the model list includes nano-banana-2-lite and no longer offers the original nano-banana", () => {
+test("the model list includes current nano-banana models and no longer offers the original", () => {
+  assert.ok((IMAGE_MODELS as readonly string[]).includes("nano-banana-2-1"));
   assert.ok((IMAGE_MODELS as readonly string[]).includes("nano-banana-2-lite"));
   // The first-generation model was dropped from the flag surface on 2026-09-15;
   // the API still accepts it, so --data '{"ai_model":"nano-banana"}' remains the escape hatch.

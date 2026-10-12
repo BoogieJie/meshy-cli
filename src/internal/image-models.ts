@@ -14,6 +14,7 @@ export const IMAGE_MODELS = [
   "gpt-image-2-5-flare",
   "gpt-image-2-5-sunburst",
   "nano-banana-pro",
+  "nano-banana-2-1",
   "nano-banana-2",
   "nano-banana-2-lite",
 ] as const;
@@ -26,7 +27,7 @@ export const GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-2-5-flare", "gpt-imag
 export const IMAGE_MODEL_HELP =
   "gpt-image-2 (default) | gpt-image-2-5-flare (GPT Image 2.5, fast tier) | " +
   "gpt-image-2-5-sunburst (GPT Image 2.5, precision-edit tier) | nano-banana-pro | " +
-  "nano-banana-2 | nano-banana-2-lite (fastest, cheapest)";
+  "nano-banana-2-1 | nano-banana-2 | nano-banana-2-lite (fastest, cheapest)";
 
 export const ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"] as const;
 
