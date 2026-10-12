@@ -14,7 +14,18 @@
 export type ApiBase = "v1" | "v2" | "creative-lab";
 export type MediaKind = "image" | "model";
 export type Billing = "none" | "may-charge";
-export type CreativeLabProduct = "figure" | "lamp" | "keychain" | "fridge-magnet";
+/** Two-stage products (prototype → build). */
+export type CreativeLabProduct =
+  | "figure"
+  | "lamp"
+  | "keychain"
+  | "fridge-magnet"
+  | "vinyl-figure"
+  | "brick-figure"
+  | "keycap"
+  | "fidget-pixel";
+/** Products with a single create, no stages. */
+export type CreativeLabSingleProduct = "fidget-collapsible";
 export type CreativeLabStage = "prototype" | "build";
 export type Verb = "create" | "get" | "list" | "delete" | "stream";
 
@@ -54,7 +65,7 @@ export interface TaskResourceDescriptor {
   billing: { create: Billing };
   /** Never true in S1: nothing billable is retried for the caller. */
   automaticRetry: false;
-  creativeLab?: { product: CreativeLabProduct; stage: CreativeLabStage };
+  creativeLab?: { product: CreativeLabProduct | CreativeLabSingleProduct; stage: CreativeLabStage | null };
   summary: string;
 }
 
@@ -99,7 +110,17 @@ function v1(id: string, relativePath: string, opts: {
   };
 }
 
-export const CREATIVE_LAB_PRODUCTS: readonly CreativeLabProduct[] = ["figure", "lamp", "keychain", "fridge-magnet"];
+export const CREATIVE_LAB_PRODUCTS: readonly CreativeLabProduct[] = [
+  "figure",
+  "lamp",
+  "keychain",
+  "fridge-magnet",
+  "vinyl-figure",
+  "brick-figure",
+  "keycap",
+  "fidget-pixel",
+];
+export const CREATIVE_LAB_SINGLE_PRODUCTS: readonly CreativeLabSingleProduct[] = ["fidget-collapsible"];
 export const CREATIVE_LAB_STAGES: readonly CreativeLabStage[] = ["prototype", "build"];
 const CREATIVE_LAB_IMAGE_FORMATS = ["jpg", "jpeg", "png", "webp"] as const;
 
@@ -117,6 +138,25 @@ function creativeLab(product: CreativeLabProduct, stage: CreativeLabStage, summa
     billing: { create: "may-charge" },
     automaticRetry: false,
     creativeLab: { product, stage },
+    summary,
+  };
+}
+
+/** A single-stage product: one create on the product root, no prototype/build. */
+function creativeLabSingle(product: CreativeLabSingleProduct, summary: string): TaskResourceDescriptor {
+  const relativePath = `/${product}/v1`;
+  return {
+    id: `creative-lab.${product}`,
+    commandPath: ["creative-lab", product],
+    base: "creative-lab",
+    relativePath,
+    legacyEndpoint: `/openapi/creative-lab${relativePath}`,
+    supports: ALL_VERBS,
+    mediaFields: [image("image_url", false, CREATIVE_LAB_IMAGE_FORMATS)],
+    taskTypes: [`creative-lab-${product}`],
+    billing: { create: "may-charge" },
+    automaticRetry: false,
+    creativeLab: { product, stage: null },
     summary,
   };
 }
@@ -159,6 +199,15 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
   creativeLab("keychain", "build", "Creative Lab keychain: prototype → relief GLB / OBJ bundle (zip) / zip"),
   creativeLab("fridge-magnet", "prototype", "Creative Lab fridge magnet: photo → styled concept image"),
   creativeLab("fridge-magnet", "build", "Creative Lab fridge magnet: prototype → relief GLB / OBJ bundle (zip) / zip"),
+  creativeLab("vinyl-figure", "prototype", "Creative Lab vinyl figure: photo → big-head vinyl concept image"),
+  creativeLab("vinyl-figure", "build", "Creative Lab vinyl figure: prototype → textured GLB/OBJ/MTL"),
+  creativeLab("brick-figure", "prototype", "Creative Lab brick figure: photo → brick minifigure concept image"),
+  creativeLab("brick-figure", "build", "Creative Lab brick figure: prototype → textured GLB/OBJ/MTL"),
+  creativeLab("keycap", "prototype", "Creative Lab keycap: photo → keycap design (one candidate)"),
+  creativeLab("keycap", "build", "Creative Lab keycap: prototype candidate → GLB + OBJ bundle (zip), real-world mm"),
+  creativeLab("fidget-pixel", "prototype", "Creative Lab fidget pixel: photo → pixel-art image (person | other)"),
+  creativeLab("fidget-pixel", "build", "Creative Lab fidget pixel: prototype → 3MF board, one object per piece"),
+  creativeLabSingle("fidget-collapsible", "Creative Lab collapsible fidget: photo → printable STL (+ preview GLB), one stage"),
 ];
 
 const BY_ID = new Map(TASK_RESOURCES.map((d) => [d.id, d] as const));

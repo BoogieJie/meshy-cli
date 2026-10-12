@@ -216,7 +216,8 @@ local commands with their kind.
 | `analyze-printability` | `/print/analyze` | [docs](https://docs.meshy.ai/en/api/analyze-printability) |
 | `repair-printability` | `/print/repair` | [docs](https://docs.meshy.ai/en/api/repair-printability) |
 | `auto-split` | `/print/split` | [docs](https://docs.meshy.ai/en/api/auto-split) |
-| `creative-lab <product> prototype\|build` | `/openapi/creative-lab/<product>/v1/<stage>` | [figure](https://docs.meshy.ai/en/api/creative-lab-figure) · [lamp](https://docs.meshy.ai/en/api/creative-lab-lamp) · [keychain](https://docs.meshy.ai/en/api/creative-lab-keychain) · [fridge-magnet](https://docs.meshy.ai/en/api/creative-lab-fridge-magnet) |
+| `creative-lab <product> prototype\|build` | `/openapi/creative-lab/<product>/v1/<stage>` | [figure](https://docs.meshy.ai/en/api/creative-lab-figure) · [vinyl-figure](https://docs.meshy.ai/en/api/creative-lab-vinyl-figure) · [brick-figure](https://docs.meshy.ai/en/api/creative-lab-brick-figure) · [lamp](https://docs.meshy.ai/en/api/creative-lab-lamp) · [keychain](https://docs.meshy.ai/en/api/creative-lab-keychain) · [fridge-magnet](https://docs.meshy.ai/en/api/creative-lab-fridge-magnet) · [keycap](https://docs.meshy.ai/en/api/creative-lab-keycap) · [fidget-pixel](https://docs.meshy.ai/en/api/creative-lab-fidget-pixel) |
+| `creative-lab fidget-collapsible` | `/openapi/creative-lab/fidget-collapsible/v1` | [docs](https://docs.meshy.ai/en/api/creative-lab-fidget-collapsible) |
 | `animation-catalog list` | `GET /animations/library` (free) | [docs](https://docs.meshy.ai/en/api/animation#list-animations) |
 | `usage tasks` | `GET /usage/tasks` (Studio/Enterprise; free) | [docs](https://docs.meshy.ai/en/api/usage) |
 | `showcases list` | `GET /showcases` (Enterprise; every request is billed) | [docs](https://docs.meshy.ai/en/api/enterprise-api) |
@@ -264,15 +265,27 @@ wait the whole hour in one go.
 
 ### Creative Lab
 
-Four products (`figure`, `lamp`, `keychain`, `fridge-magnet`), each with a
-`prototype` stage (photo → styled concept image; the lamp prototype also yields
-a lampshade GLB) and a `build` stage that consumes a SUCCEEDED prototype created
-through this API with the same key. Build options are validated per product
-before anything is sent: lamp `--options` (diameter, thickness, light-source
-preset, rotations …) with `--model-format stl|zip`; keychain and fridge-magnet
-relief options with `--model-format glb|obj|zip` — their `obj` output is a ZIP
-bundle and is saved as `.zip`; figure has no options. Prototypes made in the
-web app are rejected by the server (404).
+Eight two-stage products (`figure`, `vinyl-figure`, `brick-figure`, `lamp`,
+`keychain`, `fridge-magnet`, `keycap`, `fidget-pixel`), each with a `prototype`
+stage (photo → concept image; the lamp prototype also yields a lampshade GLB)
+and a `build` stage that consumes a SUCCEEDED prototype created through this API
+with the same key. Build options are validated per product before anything is
+sent: lamp `--options` (diameter, thickness, light-source preset, rotations …)
+with `--model-format stl|zip`; keychain and fridge-magnet relief options with
+`--model-format glb|obj|zip` — their `obj` output is a ZIP bundle and is saved
+as `.zip`; keycap `--candidate-id` (from the prototype's `candidate_ids`) and
+`--options` (`head_size_mm`, `vertical_offset_mm`), delivering a GLB and an OBJ
+bundle (`model.obj.zip`) at real-world millimetres; fidget-pixel `--options`
+(`shape`, `grid_size` 16|32, `piece_size_mm`, `color_count`, `piece_height_mm`)
+and a 3MF board. The fidget-pixel prototype needs `--type person|other`; the
+keychain prototype takes `--name-text` (up to 10 characters, engraved; the build
+inherits it). The figure-style products have no build options. Prototypes made
+in the web app are rejected by the server (404).
+
+`fidget-collapsible` has a single stage:
+`meshy creative-lab fidget-collapsible create --image-url ./photo.png` →
+a printable STL (plus a preview GLB when available), with the same
+get/list/wait/stream/delete verbs.
 
 ## Saving artifacts with `-o` (legacy) and `meshy download` (selective)
 

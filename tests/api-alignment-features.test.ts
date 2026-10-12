@@ -148,3 +148,89 @@ test("rigging list is enabled (GET /openapi/v1/rigging)", async () => {
     assert.equal(api.requests[0]!.path, "/openapi/v1/rigging");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Creative Lab: vinyl-figure, brick-figure, keycap, fidget-pixel, fidget-collapsible, keychain engraving
+// ---------------------------------------------------------------------------
+
+const PHOTO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC";
+
+test("Creative Lab: the new two-stage products post to their own prototype/build paths", async () => {
+  await withApi(accept, async (api) => {
+    for (const product of ["vinyl-figure", "brick-figure"]) {
+      const proto = await runCli(["creative-lab", product, "prototype", "create", "--image-url", PHOTO, "--remove-background", "--async"], { env: api.env() });
+      assert.equal(proto.code, 0, proto.stderr);
+      const build = await runCli(["creative-lab", product, "build", "create", "--input-task-id", "p-1", "--async"], { env: api.env() });
+      assert.equal(build.code, 0, build.stderr);
+    }
+    assert.deepEqual(api.requests.map((q) => q.path), [
+      "/openapi/creative-lab/vinyl-figure/v1/prototype",
+      "/openapi/creative-lab/vinyl-figure/v1/build",
+      "/openapi/creative-lab/brick-figure/v1/prototype",
+      "/openapi/creative-lab/brick-figure/v1/build",
+    ]);
+    assert.equal(body(api, 0)["remove_background"], true);
+  });
+});
+
+test("Creative Lab keycap build: --candidate-id is required and the options are range-checked before the request", async () => {
+  await withApi(accept, async (api) => {
+    const ok = await runCli(["creative-lab", "keycap", "build", "create", "--input-task-id", "p-1", "--candidate-id", "c-0", "--options", '{"head_size_mm":30,"vertical_offset_mm":-2}', "--async"], { env: api.env() });
+    assert.equal(ok.code, 0, ok.stderr);
+    assert.deepEqual(body(api), { input_task_id: "p-1", candidate_id: "c-0", options: { head_size_mm: 30, vertical_offset_mm: -2 } });
+    assert.equal(api.requests[0]!.path, "/openapi/creative-lab/keycap/v1/build");
+    for (const extra of [[], ["--candidate-id", "c-0", "--options", '{"head_size_mm":50}'], ["--candidate-id", "c-0", "--options", '{"base_model":"sa-1u"}']]) {
+      const r = await runCli(["creative-lab", "keycap", "build", "create", "--input-task-id", "p-1", ...extra, "--async"], { env: api.env() });
+      assert.equal(r.code, 2, `${extra.join(" ")}: ${r.stdout}`);
+    }
+    assert.equal(api.requests.length, 1);
+  });
+});
+
+test("Creative Lab fidget-pixel: prototype needs --type and has no --remove-background; build options and 3mf output are checked", async () => {
+  await withApi(accept, async (api) => {
+    const proto = await runCli(["creative-lab", "fidget-pixel", "prototype", "create", "--image-url", PHOTO, "--type", "other", "--async"], { env: api.env() });
+    assert.equal(proto.code, 0, proto.stderr);
+    assert.equal(body(api, 0)["type"], "other");
+    assert.equal((await runCli(["creative-lab", "fidget-pixel", "prototype", "create", "--image-url", PHOTO, "--async"], { env: api.env() })).code, 2);
+    assert.equal((await runCli(["creative-lab", "fidget-pixel", "prototype", "create", "--image-url", PHOTO, "--type", "person", "--remove-background", "--async"], { env: api.env() })).code, 2);
+
+    const build = await runCli(["creative-lab", "fidget-pixel", "build", "create", "--input-task-id", "p-1", "--options", '{"shape":"hex","grid_size":16,"piece_size_mm":8}', "--model-format", "3mf", "--async"], { env: api.env() });
+    assert.equal(build.code, 0, build.stderr);
+    assert.deepEqual(body(api, 1), { input_task_id: "p-1", options: { shape: "hex", grid_size: 16, piece_size_mm: 8 }, output: { format: "3mf" } });
+    for (const options of ['{"shape":"hex","piece_size_mm":10}', '{"grid_size":24}', '{"color_count":9}']) {
+      const r = await runCli(["creative-lab", "fidget-pixel", "build", "create", "--input-task-id", "p-1", "--options", options, "--async"], { env: api.env() });
+      assert.equal(r.code, 2, `${options}: ${r.stdout}`);
+    }
+    assert.equal(api.requests.length, 2);
+  });
+});
+
+test("Creative Lab fidget-collapsible: one stage on the product root, with the shared verbs", async () => {
+  await withApi((req, res) => {
+    if (req.method === "POST") return jsonReply(res, 200, { result: "fc-1" });
+    return jsonReply(res, 200, { id: "fc-1", type: "creative-lab-fidget-collapsible", status: "SUCCEEDED", progress: 100, model_urls: { stl: "https://assets.example.invalid/model.stl" } });
+  }, async (api) => {
+    const r = await runCli(["creative-lab", "fidget-collapsible", "create", "--image-url", PHOTO, "--name", "demo", "--async"], { env: api.env() });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal((parseSingleJson(r.stdout) as { command: string }).command, "creative-lab.fidget-collapsible.create");
+    const get = await runCli(["creative-lab", "fidget-collapsible", "get", "fc-1"], { env: api.env() });
+    assert.equal(get.code, 0, get.stderr);
+    assert.deepEqual(api.requests.map((q) => `${q.method} ${q.path}`), [
+      "POST /openapi/creative-lab/fidget-collapsible/v1",
+      "GET /openapi/creative-lab/fidget-collapsible/v1/fc-1",
+    ]);
+    assert.deepEqual(body(api), { image_url: PHOTO, name: "demo" });
+  });
+});
+
+test("Creative Lab keychain --name-text: up to 10 characters counted as characters, not bytes", async () => {
+  await withApi(accept, async (api) => {
+    const ok = await runCli(["creative-lab", "keychain", "prototype", "create", "--image-url", PHOTO, "--name-text", "小明的小狗小猫小鸟鱼", "--async"], { env: api.env() });
+    assert.equal(ok.code, 0, ok.stderr);
+    assert.equal(body(api)["name_text"], "小明的小狗小猫小鸟鱼");
+    const long = await runCli(["creative-lab", "keychain", "prototype", "create", "--image-url", PHOTO, "--name-text", "ABCDEFGHIJK", "--async"], { env: api.env() });
+    assert.equal(long.code, 2, long.stdout);
+    assert.equal(api.requests.length, 1);
+  });
+});

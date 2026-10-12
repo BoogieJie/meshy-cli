@@ -1,16 +1,22 @@
 /**
- * creative-lab — https://docs.meshy.ai/en/api/creative-lab-{figure,lamp,keychain,fridge-magnet}
+ * creative-lab — https://docs.meshy.ai/en/api/creative-lab-<product>
  *
- * Four products × two stages, each its own registered resource with the same
- * create/get/list/wait/stream/delete verbs. Nothing here builds a path from a
- * user string: product and stage are resolved through the registry.
+ * Two-stage products (prototype → build), each stage its own registered
+ * resource with the same create/get/list/wait/stream/delete verbs, plus the
+ * single-stage collapsible fidget. Nothing here builds a path from a user
+ * string: product and stage are resolved through the registry.
  *
  * Stage meanings differ by product and are not generalised:
- *   figure / keychain / fridge-magnet prototype → a styled concept image
+ *   figure / vinyl-figure / brick-figure / keychain / fridge-magnet prototype → a styled concept image
  *   lamp prototype                              → concept image + lampshade GLB
- *   figure build                                → GLB, OBJ, MTL, base-color texture
+ *   keycap prototype                            → a design render + a candidate id for build
+ *   fidget-pixel prototype                      → a pixel-art image (type person | other)
+ *   figure / vinyl-figure / brick-figure build  → GLB, OBJ, MTL, base-color texture
  *   lamp build                                  → lamp_stl (+ base_stl) or bundle_zip
  *   keychain / fridge-magnet build              → glb, obj (a ZIP bundle) or bundle_zip
+ *   keycap build                                → glb + obj_zip, real-world millimetres
+ *   fidget-pixel build                          → one 3MF, one object per piece
+ *   fidget-collapsible (single stage)           → stl (+ a best-effort preview glb)
  *
  * Build options are validated per product with the ranges the API documents
  * so a bad value fails before a billable POST; unknown option keys are passed
@@ -28,6 +34,7 @@ import { parseJsonFlag } from "../internal/payload.js";
 import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task-command.js";
 
 const NAME_MAX = 100;
+const NAME_TEXT_MAX = 10;
 
 const lampOptionsSchema = z
   .object({
@@ -63,15 +70,39 @@ const reliefOptionsSchema = z
   })
   .passthrough();
 
+const keycapOptionsSchema = z
+  .object({
+    base_model: z.enum(["cherry-mx-1x1-r1"]).optional(),
+    head_size_mm: z.number().min(10).max(40).optional(),
+    vertical_offset_mm: z.number().min(-5).max(5).optional(),
+  })
+  .passthrough();
+
+const fidgetPixelOptionsSchema = z
+  .object({
+    shape: z.enum(["square", "hex"]).optional(),
+    grid_size: z.union([z.literal(16), z.literal(32)]).optional(),
+    piece_size_mm: z.union([z.literal(6), z.literal(8), z.literal(10)]).optional(),
+    color_count: z.number().int().min(1).max(8).optional(),
+    piece_height_mm: z.number().int().min(10).max(80).optional(),
+  })
+  .passthrough()
+  .refine((o) => !(o.shape === "hex" && o.piece_size_mm === 10), { message: "hex pieces come in 6 or 8 mm only", path: ["piece_size_mm"] });
+
 interface ProductDescriptor {
   product: CreativeLabProduct;
   label: string;
   prototypeMeaning: string;
   buildMeaning: string;
+  /** Whether the prototype takes `remove_background` (default: true). */
+  removeBackground?: boolean;
   /** Extra prototype flags beyond image/name/remove-background. */
   prototypeExtra?: (cmd: Command) => Command;
   prototypeExtraPayload?: (opts: Record<string, unknown>) => Record<string, unknown>;
   validatePrototype?: (payload: Record<string, unknown>) => void;
+  /** Extra build flags beyond input-task-id/name/options/model-format. */
+  buildExtra?: (cmd: Command) => Command;
+  buildExtraPayload?: (opts: Record<string, unknown>) => Record<string, unknown>;
   /** Build output formats (`output.format`); undefined when the product has none. */
   buildFormats?: readonly string[];
   optionsSchema?: z.ZodTypeAny;
@@ -80,13 +111,52 @@ interface ProductDescriptor {
   validateBuild?: (payload: Record<string, unknown>) => void;
 }
 
+const figureLike = (product: CreativeLabProduct, label: string, style: string): ProductDescriptor => ({
+  product,
+  label,
+  prototypeMeaning: `${style} concept image`,
+  buildMeaning: `textured ${label}: GLB, OBJ + MTL and a base-color texture`,
+  hasBuildOptions: false,
+});
+
 const PRODUCTS: Record<CreativeLabProduct, ProductDescriptor> = {
-  figure: {
-    product: "figure",
-    label: "figure",
-    prototypeMeaning: "styled concept image of the figure",
-    buildMeaning: "textured figure: GLB, OBJ + MTL and a base-color texture",
-    hasBuildOptions: false,
+  figure: figureLike("figure", "figure", "styled"),
+  "vinyl-figure": figureLike("vinyl-figure", "vinyl figure", "big-head vinyl figure"),
+  "brick-figure": figureLike("brick-figure", "brick figure", "brick minifigure"),
+  keycap: {
+    product: "keycap",
+    label: "keycap",
+    prototypeMeaning: "keycap design render plus a candidate id for build",
+    buildMeaning: "keycap: GLB and an OBJ bundle (zip), real-world millimetres",
+    buildExtra: (cmd) => cmd.option("--candidate-id <id>", "the candidate to build, from the prototype's candidate_ids (required)"),
+    buildExtraPayload: (opts) => ({ candidate_id: opts.candidateId }),
+    optionsSchema: keycapOptionsSchema,
+    hasBuildOptions: true,
+    validateBuild: (payload) => {
+      if (typeof payload.candidate_id !== "string" || !payload.candidate_id) {
+        throw new UsageError("keycap build: provide --candidate-id (an entry of the prototype's candidate_ids)");
+      }
+    },
+  },
+  "fidget-pixel": {
+    product: "fidget-pixel",
+    label: "fidget pixel",
+    prototypeMeaning: "pixel-art image of the subject",
+    buildMeaning: "pixel board: one 3MF with one object per piece",
+    removeBackground: false,
+    prototypeExtra: (cmd) =>
+      cmd.addOption(
+        new Option("--type <subject>", "what the photo shows (required): person (chibi sprite) | other (bead-art icon)").choices(["person", "other"]),
+      ),
+    prototypeExtraPayload: (opts) => ({ type: opts.type }),
+    validatePrototype: (payload) => {
+      if (payload.type !== "person" && payload.type !== "other") {
+        throw new UsageError("fidget-pixel prototype: provide --type person | other");
+      }
+    },
+    buildFormats: ["3mf"],
+    optionsSchema: fidgetPixelOptionsSchema,
+    hasBuildOptions: true,
   },
   lamp: {
     product: "lamp",
@@ -119,6 +189,14 @@ const PRODUCTS: Record<CreativeLabProduct, ProductDescriptor> = {
     product: "keychain",
     label: "keychain",
     prototypeMeaning: "styled concept image of the keychain",
+    prototypeExtra: (cmd) => cmd.option("--name-text <text>", `text to engrave, at most ${NAME_TEXT_MAX} characters (the build inherits it; --name only labels the task)`),
+    prototypeExtraPayload: (opts) => ({ name_text: opts.nameText }),
+    validatePrototype: (payload) => {
+      if (payload.name_text === undefined) return;
+      if (typeof payload.name_text !== "string") throw new UsageError("name_text must be a string");
+      const length = [...payload.name_text.trim()].length;
+      if (length > NAME_TEXT_MAX) throw new UsageError(`--name-text must be at most ${NAME_TEXT_MAX} characters (got ${length})`);
+    },
     buildMeaning: "relief keychain: glb, obj (a ZIP bundle with model.obj/model.mtl/texture.png) or bundle_zip",
     buildFormats: ["glb", "obj", "zip"],
     optionsSchema: reliefOptionsSchema,
@@ -152,8 +230,8 @@ function prototypeSpec(p: ProductDescriptor): ResourceCommandSpec {
       configure(cmd) {
         const base = cmd
           .option("--image-url <src>", "photo as http(s) URL, data: URI or local jpg/jpeg/png/webp path (required)")
-          .option("--name <text>", `optional name, at most ${NAME_MAX} characters`)
-          .option("--remove-background", "return the concept image as a transparent RGBA PNG (default: false)");
+          .option("--name <text>", `optional name, at most ${NAME_MAX} characters`);
+        if (p.removeBackground !== false) base.option("--remove-background", "return the concept image as a transparent RGBA PNG (default: false)");
         return p.prototypeExtra ? p.prototypeExtra(base) : base;
       },
       toPayload(opts) {
@@ -191,6 +269,7 @@ function buildSpec(p: ProductDescriptor): ResourceCommandSpec {
         cmd
           .option("--input-task-id <id>", "SUCCEEDED prototype task of the same product created with the same API key (required)")
           .option("--name <text>", `optional name, at most ${NAME_MAX} characters`);
+        p.buildExtra?.(cmd);
         if (p.hasBuildOptions) {
           cmd.option("--options <json>", "product-specific build options as JSON (or @file.json); merged into payload.options, typed flags win");
           if (p.buildFormats) {
@@ -206,6 +285,7 @@ function buildSpec(p: ProductDescriptor): ResourceCommandSpec {
         const payload: Record<string, unknown> = {
           input_task_id: opts.inputTaskId,
           name: opts.name,
+          ...(p.buildExtraPayload ? p.buildExtraPayload(opts) : {}),
         };
         if (p.hasBuildOptions) {
           const optionsFlag = parseJsonFlag(opts.options as string | undefined, "--options");
@@ -251,6 +331,33 @@ function buildSpec(p: ProductDescriptor): ResourceCommandSpec {
   };
 }
 
+/** The collapsible fidget: one create on the product root, no prototype/build. */
+function collapsibleFidgetSpec(): ResourceCommandSpec {
+  return {
+    name: "creative-lab.fidget-collapsible",
+    commandName: "fidget-collapsible",
+    defaultSchema: "v1",
+    description: "Creative Lab collapsible fidget — one stage: photo → printable STL (plus a preview GLB when available)",
+    create: {
+      description: "Create a collapsible fidget from a photo",
+      configure(cmd) {
+        return cmd
+          .option("--image-url <src>", "photo as http(s) URL, data: URI or local jpg/jpeg/png/webp path (required)")
+          .option("--name <text>", `optional task label, at most ${NAME_MAX} characters (nothing is engraved)`);
+      },
+      toPayload(opts) {
+        return { image_url: opts.imageUrl, name: opts.name };
+      },
+      validatePayload(payload) {
+        if (payload.image_url === undefined || payload.image_url === null || payload.image_url === "") {
+          throw new UsageError("provide --image-url (a photo URL, data: URI or local file)");
+        }
+        checkName(payload);
+      },
+    },
+  };
+}
+
 function productCommand(product: CreativeLabProduct): Command {
   const p = PRODUCTS[product];
   const cmd = new Command(product).description(`Creative Lab ${p.label}: prototype (${p.prototypeMeaning}) then build (${p.buildMeaning})`);
@@ -260,7 +367,9 @@ function productCommand(product: CreativeLabProduct): Command {
 }
 
 export const creativeLabCommand = new Command("creative-lab")
-  .description("Creative Lab physical products from a photo: figure | lamp | keychain | fridge-magnet, each with prototype and build stages")
+  .description(
+    `Creative Lab physical products from a photo: ${CREATIVE_LAB_PRODUCTS.join(" | ")} (prototype then build stages) and fidget-collapsible (one stage)`,
+  )
   .addHelpText(
     "after",
     `
@@ -271,9 +380,13 @@ prototypes are rejected by the server (404). Build never re-runs a prototype.
     meshy creative-lab figure prototype create --image-url ./photo.png --name demo --async
     meshy creative-lab figure build create --input-task-id <prototype-id> --async
     meshy creative-lab lamp build create --input-task-id <id> --model-format zip --options '{"diameter_mm":180}'
+    meshy creative-lab keycap build create --input-task-id <prototype-id> --candidate-id <candidate-id>
+    meshy creative-lab fidget-pixel prototype create --image-url ./pet.jpg --type other
+    meshy creative-lab fidget-collapsible create --image-url ./photo.png
 `,
   );
 
 for (const product of CREATIVE_LAB_PRODUCTS) creativeLabCommand.addCommand(productCommand(product));
+creativeLabCommand.addCommand(buildResourceCommand(collapsibleFidgetSpec()));
 
 export const CREATIVE_LAB_STAGE_NAMES: readonly CreativeLabStage[] = ["prototype", "build"];

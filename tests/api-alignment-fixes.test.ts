@@ -258,3 +258,15 @@ test("an animation task (type animate) is matched to the animate resource by dow
   const out = parseSingleJson(r.stdout) as { result: { source: { resource: string } } };
   assert.equal(out.result.source.resource, "animate");
 });
+
+test("a keycap build's obj_zip is a ZIP bundle saved as model.obj.zip", async () => {
+  const cwd = tmpDir("meshy-keycap-");
+  writeFileSync(join(cwd, "keycap.json"), JSON.stringify({ id: "k-1", type: "creative-lab-keycap-build", status: "SUCCEEDED", model_urls: { glb: "https://assets.example.invalid/model.glb", obj_zip: "https://assets.example.invalid/model-obj.zip" } }));
+  const r = await runCli(["download", "--task-json", "keycap.json", "--list", "--output-schema", "v1"], { cwd });
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  const out = parseSingleJson(r.stdout) as { result: { source: { resource: string }; assets: Array<{ key: string; filename: string; format: string }> } };
+  assert.equal(out.result.source.resource, "creative-lab.keycap.build");
+  const bundle = out.result.assets.find((a) => a.key === "model.obj_zip")!;
+  assert.equal(bundle.filename, "model.obj.zip");
+  assert.equal(bundle.format, "zip");
+});

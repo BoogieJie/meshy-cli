@@ -66,7 +66,7 @@ test("query resources agree with the documentation", () => {
   assert.equal(QUERY_RESOURCES.find((q) => q.id === "showcases")?.billing, "may-charge");
 });
 
-test("Creative Lab: 4 products × 2 stages, exact paths, no path built from user strings (T-022, T-023)", () => {
+test("Creative Lab: every two-stage product × 2 stages, exact paths, no path built from user strings (T-022, T-023)", () => {
   for (const product of CREATIVE_LAB_PRODUCTS) {
     for (const stage of ["prototype", "build"] as const) {
       const r = creativeLabResource(product, stage);
@@ -78,11 +78,15 @@ test("Creative Lab: 4 products × 2 stages, exact paths, no path built from user
       assert.equal(r.mediaFields.length, stage === "prototype" ? 1 : 0);
     }
   }
-  for (const [p, s] of [["../figure", "prototype"], ["figure", "../build"], ["https://evil.example/", "build"], ["figure prototype", "build"], ["Figure", "prototype"], ["", "prototype"], ["keycap", "build"]]) {
+  for (const [p, s] of [["../figure", "prototype"], ["figure", "../build"], ["https://evil.example/", "build"], ["figure prototype", "build"], ["Figure", "prototype"], ["", "prototype"], ["teapot", "build"], ["fidget-collapsible", "build"]]) {
     assert.equal(creativeLabResource(p!, s!), undefined, `${p}/${s} must not resolve`);
   }
   assert.equal(taskResourceByCommandPath(["creative-lab", "lamp", "build"])?.id, "creative-lab.lamp.build");
   assert.equal(taskResourceByCommandPath(["creative-lab", "lamp"]), undefined);
+  // The one single-stage product sits on the product root.
+  const fidget = taskResourceByCommandPath(["creative-lab", "fidget-collapsible"]);
+  assert.equal(fidget?.legacyEndpoint, "/openapi/creative-lab/fidget-collapsible/v1");
+  assert.equal(fidget?.creativeLab?.stage, null);
 });
 
 test("legacy routing facts: animate → /animations, text-to-3d on v2, rigging list enabled", () => {

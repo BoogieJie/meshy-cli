@@ -1019,3 +1019,21 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   than sent to be ignored, and `by_parts` / `by_color` without a prompt fail
   before the request. Thin-wall reinforcement after a cut is always on in the
   API and has no flag.
+
+## D-075 More Creative Lab products, and one without stages
+
+- vinyl-figure and brick-figure follow figure (no build options); keycap's
+  build needs the prototype's `candidate_id` and takes `head_size_mm` /
+  `vertical_offset_mm` / `base_model` options; fidget-pixel's prototype needs
+  `type` and takes no `remove_background`, and its build takes board options
+  and `output.format` 3mf. Every option range the API documents is checked
+  before the request, as for the existing products.
+- fidget-collapsible has no prototype/build pair: one POST on the product
+  root. It is registered as `creative-lab.fidget-collapsible` with
+  `creativeLab.stage: null`, commanded as `meshy creative-lab
+  fidget-collapsible <verb>`; the two-stage list (`CREATIVE_LAB_PRODUCTS`) stays
+  two-stage only.
+- keycap's `model_urls.obj_zip` is a ZIP bundle, named `model.obj.zip` like the
+  keychain/fridge-magnet OBJ bundle (D-060).
+- keychain's `name_text` (engraving, prototype stage) is limited to 10
+  characters counted as code points after trimming, matching the API.

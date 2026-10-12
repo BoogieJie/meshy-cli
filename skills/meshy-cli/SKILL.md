@@ -94,19 +94,24 @@ meshy <resource> list [--page-size <n>] --output-schema v1
 
 ```bash
 meshy uv-unwrap create --input-task-id <id> --async --output-schema v1              # GLB only, ≤40k faces (server enforces)
-meshy creative-lab <figure|lamp|keychain|fridge-magnet> prototype create --image-url ./photo.png --name demo --async --output-schema v1
+meshy creative-lab <figure|vinyl-figure|brick-figure|lamp|keychain|fridge-magnet|keycap|fidget-pixel> prototype create --image-url ./photo.png --name demo --async --output-schema v1
 meshy creative-lab <product> build create --input-task-id <prototype-id> [--model-format …] [--options '<json>'] --async --output-schema v1
+meshy creative-lab fidget-collapsible create --image-url ./photo.png --async --output-schema v1   # one stage → STL
 meshy animation-catalog list --category DailyActions --search wave --output-schema v1   # free; search is server-side
 meshy auto-split create --input-task-id <id> --mode by_parts --prompt "head, torso" --async --output-schema v1   # printable parts
 meshy usage tasks --start-time 2026-08-01T00:00:00Z --output-schema v1                 # Studio/Enterprise; credits per task
 meshy showcases list --search car --page-size 3 --output-schema v1                      # Enterprise only; EVERY request is billed
 ```
 
-Prototype meanings differ: figure/keychain/fridge-magnet yield a concept image,
-lamp also yields a lampshade GLB. Build consumes a SUCCEEDED prototype made
-through this API with the same key (web-app prototypes → 404). Lamp builds output
-`lamp_stl`/`base_stl` or `bundle_zip`; keychain/fridge-magnet `obj` output is a
-ZIP bundle saved as `.zip`. Never call `showcases` in a health check.
+Prototype meanings differ: most yield a concept image, lamp also yields a
+lampshade GLB, keycap yields `candidate_ids` (pass one as the build's
+`--candidate-id`), fidget-pixel needs `--type person|other`; keychain takes
+`--name-text` (≤10 characters, engraved). Build consumes a SUCCEEDED prototype
+made through this API with the same key (web-app prototypes → 404). Lamp builds
+output `lamp_stl`/`base_stl` or `bundle_zip`; keychain/fridge-magnet `obj` and
+keycap `obj_zip` are ZIP bundles saved as `.zip`; fidget-pixel builds a 3MF.
+Creative Lab `delete` cancels (`canceled: true`). Never call `showcases` in a
+health check.
 
 ## Downloads, projects, printing (local, no key)
 
