@@ -64,6 +64,50 @@ test("analyze/repair: a local .stl/.obj/.fbx is refused before the wire with a w
   });
 });
 
+test("every other model input refuses a local non-glTF file the same way; .glb (and .gltf where supported) still goes inline", async () => {
+  const FBX = Buffer.concat([Buffer.from("Kaydara FBX Binary  \0"), Buffer.alloc(16)]);
+  await withApi(accept(), async (api) => {
+    const cwd = tmpDir("meshy-model-in-");
+    writeFileSync(join(cwd, "part.stl"), "solid x\nendsolid x\n");
+    writeFileSync(join(cwd, "part.obj"), "v 0 0 0\n");
+    writeFileSync(join(cwd, "part.fbx"), FBX);
+    writeFileSync(join(cwd, "part.glb"), GLB);
+    writeFileSync(join(cwd, "part.gltf"), JSON.stringify({ asset: { version: "2.0" } }));
+    const commands: Array<[string, string[], string[]]> = [
+      ["remesh", [], ["glb", "gltf"]],
+      ["convert", ["--target-formats", "stl"], ["glb", "gltf"]],
+      ["resize", ["--resize-height", "1"], ["glb", "gltf"]],
+      ["retexture", ["--text-style-prompt", "gold"], ["glb", "gltf"]],
+      ["multi-color-print", [], ["glb"]],
+    ];
+    let posts = 0;
+    for (const [cmd, extra, accepted] of commands) {
+      for (const ext of ["stl", "obj", "fbx", "glb", "gltf"]) {
+        const r = await runCli([cmd, "create", "--model-url", `part.${ext}`, ...extra, "--async", "--output-schema", "v1"], { env: api.env(), cwd });
+        if (accepted.includes(ext)) {
+          assert.equal(r.code, 0, `${cmd} .${ext}: ${r.stdout}${r.stderr}`);
+          posts += 1;
+          const sent = String((api.requests[posts - 1]!.json as Record<string, unknown>)["model_url"]);
+          assert.match(sent, ext === "glb" ? /^data:model\/gltf-binary;base64,/ : /^data:model\/gltf\+json;base64,/, `${cmd} .${ext}`);
+        } else {
+          assert.equal(r.code, 2, `${cmd} .${ext}: ${r.stdout}${r.stderr}`);
+          const out = parseSingleJson(r.stdout) as { error: { message: string } };
+          assert.match(out.error.message, /http\(s\) URL, or --input-task-id/, `${cmd} .${ext}`);
+        }
+      }
+    }
+    assert.equal(api.requests.length, posts, "a refused input costs no request");
+    // A data: URI labelled application/octet-stream (the docs' spelling) is fine when it is a GLB, refused otherwise.
+    const glbData = `data:application/octet-stream;base64,${GLB.toString("base64")}`;
+    const ok = await runCli(["remesh", "create", "--data", JSON.stringify({ model_url: glbData }), "--async", "--output-schema", "v1"], { env: api.env(), cwd });
+    assert.equal(ok.code, 0, ok.stdout);
+    const fbxData = `data:application/octet-stream;base64,${FBX.toString("base64")}`;
+    const bad = await runCli(["remesh", "create", "--data", JSON.stringify({ model_url: fbxData }), "--async", "--output-schema", "v1"], { env: api.env(), cwd });
+    assert.equal(bad.code, 2, bad.stdout);
+    assert.equal(api.requests.length, posts + 1);
+  });
+});
+
 test("analyze/repair: an http(s) .stl URL is still passed through (the server fetches it)", async () => {
   await withApi((req, res) => {
     if (req.method === "HEAD" && req.path === "/files/part.stl") return void res.writeHead(200).end();

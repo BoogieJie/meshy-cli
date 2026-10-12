@@ -208,7 +208,8 @@ function validateDataUri(
     throw new UsageError(`${flagLabel}: expected a 3D-model data: URI (model/* or application/octet-stream), got ${mime}`);
   }
   if (rule?.formats && rule.formats.length > 0) {
-    const ext = extForMime(mime);
+    // application/octet-stream says nothing about the format: a GLB is known by its magic.
+    const ext = mime === "application/octet-stream" && Buffer.from(body.slice(0, 8), "base64").subarray(0, 4).toString("latin1") === "glTF" ? "glb" : extForMime(mime);
     if (!ext || !rule.formats.includes(ext)) throw formatError(flagLabel, rule, `data: URI is ${mime}`);
   }
   return { value: input, source: "data-uri", mime, bytes };

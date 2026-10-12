@@ -82,12 +82,14 @@ const model = (path: string, formats?: readonly string[], formatsHint?: string):
 });
 
 /**
- * The printability endpoints take inline (data:) models as glTF only, and a
- * local file is always sent inline. Other formats need a URL the API can fetch.
+ * The API takes an inline (data:) model only as glTF, and a local file is
+ * always sent inline. Other formats need a URL the API can fetch itself.
+ * multi-color-print takes GLB or FBX at all, so inline it is GLB only.
  */
-const PRINT_MODEL_FORMATS = ["glb", "gltf"] as const;
-const PRINT_MODEL_HINT =
+const INLINE_MODEL_FORMATS = ["glb", "gltf"] as const;
+const INLINE_MODEL_HINT =
   "the API takes an inline (local) model as glTF only — for .stl/.obj/.fbx pass a public http(s) URL, or --input-task-id";
+const inlineModel = (path: string): MediaField => model(path, INLINE_MODEL_FORMATS, INLINE_MODEL_HINT);
 
 function v1(id: string, relativePath: string, opts: {
   mediaFields?: readonly MediaField[];
@@ -177,18 +179,18 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
   },
   v1("image-to-3d", "/image-to-3d", { mediaFields: [image("image_url")], taskTypes: ["image-to-3d"], summary: "3D from a single image (standard or smart-topology low-poly)" }),
   v1("multi-image-to-3d", "/multi-image-to-3d", { mediaFields: [image("image_urls", true), image("texture_image_urls", true)], taskTypes: ["multi-image-to-3d"], summary: "3D from multiple views (beta; prefer image-to-3d)" }),
-  v1("remesh", "/remesh", { mediaFields: [model("model_url")], taskTypes: ["remesh"], summary: "retopologize / change polycount" }),
-  v1("convert", "/convert", { mediaFields: [model("model_url")], taskTypes: ["convert"], summary: "change file format only" }),
-  v1("resize", "/resize", { mediaFields: [model("model_url")], taskTypes: ["resize"], summary: "resize to real-world dimensions" }),
+  v1("remesh", "/remesh", { mediaFields: [inlineModel("model_url")], taskTypes: ["remesh"], summary: "retopologize / change polycount" }),
+  v1("convert", "/convert", { mediaFields: [inlineModel("model_url")], taskTypes: ["convert"], summary: "change file format only" }),
+  v1("resize", "/resize", { mediaFields: [inlineModel("model_url")], taskTypes: ["resize"], summary: "resize to real-world dimensions" }),
   v1("rigging", "/rigging", { mediaFields: [model("model_url", ["glb"]), image("texture_image_url")], taskTypes: ["rig"], summary: "rig a humanoid mesh (+ bundled walk/run animations)" }),
   v1("animate", "/animations", { taskTypes: ["animate"], summary: "apply an animation clip to a rigged mesh" }),
-  v1("retexture", "/retexture", { mediaFields: [model("model_url"), image("image_style_url"), image("multiview_image_urls", true)], taskTypes: ["retexture"], summary: "regenerate textures" }),
+  v1("retexture", "/retexture", { mediaFields: [inlineModel("model_url"), image("image_style_url"), image("multiview_image_urls", true)], taskTypes: ["retexture"], summary: "regenerate textures" }),
   v1("text-to-image", "/text-to-image", { taskTypes: ["text-to-image"], summary: "2D image generation" }),
   v1("text-to-motion", "/text-to-motion", { taskTypes: ["text-to-motion"], summary: "generate a standalone skeletal motion clip from text" }),
   v1("image-to-image", "/image-to-image", { mediaFields: [image("reference_image_urls", true)], taskTypes: ["image-to-image"], summary: "2D image editing" }),
-  v1("multi-color-print", "/print/multi-color", { mediaFields: [model("model_url")], taskTypes: ["print-multi-color"], summary: "color-separated 3D print output" }),
-  v1("analyze-printability", "/print/analyze", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-analyze"], billing: "none", summary: "inspect a model for 3D-printing issues (free)" }),
-  v1("repair-printability", "/print/repair", { mediaFields: [model("model_url", PRINT_MODEL_FORMATS, PRINT_MODEL_HINT)], taskTypes: ["print-repair"], summary: "fix non-watertight / non-manifold geometry" }),
+  v1("multi-color-print", "/print/multi-color", { mediaFields: [model("model_url", ["glb"], "the API takes an inline (local) model as GLB only here — for .fbx pass a public http(s) URL, or --input-task-id")], taskTypes: ["print-multi-color"], summary: "color-separated 3D print output" }),
+  v1("analyze-printability", "/print/analyze", { mediaFields: [inlineModel("model_url")], taskTypes: ["print-analyze"], billing: "none", summary: "inspect a model for 3D-printing issues (free)" }),
+  v1("repair-printability", "/print/repair", { mediaFields: [inlineModel("model_url")], taskTypes: ["print-repair"], summary: "fix non-watertight / non-manifold geometry" }),
   v1("auto-split", "/print/split", { taskTypes: ["print-split"], summary: "split a model into printable parts (auto / by named parts / by colour; optional connectors)" }),
   v1("uv-unwrap", "/uv-unwrap", { mediaFields: [model("model_url", ["glb"])], taskTypes: ["uv-unwrap"], summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" }),
   creativeLab("figure", "prototype", "Creative Lab figure: photo → styled concept image"),

@@ -153,9 +153,10 @@ These are API rules, not preferences — ignoring them produces failed tasks:
 - **`text-to-motion` produces a standalone skeletal clip**, not an animated
   character. Pass a 2–10 second duration in 0.5-second increments.
 - **`repair-printability` drops textures and invalidates UVs.** Run it before
-  texturing, or re-`retexture` afterwards. Both printability commands take a
-  local model as `.glb`/`.gltf` only; pass `.stl`/`.obj`/`.fbx` as an http(s)
-  URL, or use `--input-task-id`.
+  texturing, or re-`retexture` afterwards.
+- **A local `--model-url` must be `.glb`/`.gltf`** (multi-color-print: `.glb`)
+  on every command: the API takes inline models as glTF only. Pass
+  `.stl`/`.obj`/`.fbx` as an http(s) URL, or use `--input-task-id`.
 - **`meshy delete <id>` never reaches Creative Lab tasks**; `meshy creative-lab
   <product> <stage> delete <id>` cancels one instead (`canceled: true`).
 - **`uv-unwrap` takes one source** (`--input-task-id` or `--model-url`, GLB only).

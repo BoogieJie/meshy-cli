@@ -411,10 +411,12 @@ accept:
 
 Missing files and 4xx/5xx preflights exit with code `2` and a flag-prefixed
 message before any task is created. GLB-only fields (`uv-unwrap`, `rigging`
-`--model-url`) reject other formats locally. `analyze-printability` and
-`repair-printability` take an inline model (a local file or a `data:` URI) as
-glTF only — `.glb` or `.gltf`; the API refuses inline STL/OBJ/FBX there, so
-host those at an http(s) URL or pass `--input-task-id`.
+`--model-url`) reject other formats locally. Every other `--model-url`
+(remesh, convert, resize, retexture, analyze/repair-printability) takes an
+inline model — a local file or a `data:` URI — as glTF only, `.glb` or `.gltf`
+(multi-color-print: `.glb`); the API refuses inline STL/OBJ/FBX, so host those
+at an http(s) URL or pass `--input-task-id`. A `data:application/octet-stream`
+URI is accepted when its bytes are a GLB.
 
 ## Global flags
 

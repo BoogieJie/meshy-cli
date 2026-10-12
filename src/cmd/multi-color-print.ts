@@ -21,7 +21,7 @@ const spec: ResourceCommandSpec = {
           "--input-task-id <id>",
           "SUCCEEDED source task (image-to-3d, multi-image-to-3d, text-to-3d, remesh, or retexture) — takes priority over --model-url",
         )
-        .option("--model-url <src>", "3D model as http(s) URL or local file path (.glb/.fbx)")
+        .option("--model-url <src>", "3D model: an http(s) URL (.glb/.fbx) or a local .glb file — the API takes an inline upload as GLB only here, so host .fbx at a URL")
         .option("--max-colors <n>", "1-16 (default: 4)", parseInt10)
         .addOption(
           new Option(

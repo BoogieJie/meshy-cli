@@ -966,17 +966,24 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   resource's `wait`); the top-level `delete` does not know the resource and
   says `meshy <resource> wait <id>`.
 
-## D-070 Printability takes inline models as glTF only
+## D-070 Inline models are glTF only
 
-- The printability endpoints accept an inline (`data:`) model only as
-  `model/gltf-binary` or `model/gltf+json`, and the CLI sends every local file
-  inline. A local `.stl`/`.obj`/`.fbx` was therefore a 400 after the round
-  trip. The API has no upload endpoint to use instead.
-- The two printability resources now declare `formats: ["glb", "gltf"]` with a
-  `formatsHint` naming the alternatives (an http(s) URL, which the API fetches
-  and checks itself, or `--input-task-id`). URLs are not format-checked
-  locally.
-- The API docs say data URLs "bypass extension checks"; for these endpoints
+- The API accepts an inline (`data:`) model only as glTF (`model/gltf-binary`,
+  `model/gltf+json`); `model/obj` and `model/stl` data URIs are refused, and an
+  FBX cannot travel as a data URI (as `application/octet-stream` it is taken
+  for a GLB). The CLI sends every local file inline, so a local
+  `.stl`/`.obj`/`.fbx` was a 400 after the round trip — or a task built on the
+  wrong format. The API has no upload endpoint to use instead.
+- Every model input except the GLB-only ones (rigging, uv-unwrap) now declares
+  `formats: ["glb", "gltf"]` with a `formatsHint` naming the alternatives (an
+  http(s) URL, which the API fetches and checks itself, or `--input-task-id`):
+  remesh, convert, resize, retexture, analyze/repair-printability.
+  multi-color-print takes only GLB or FBX at all, so it declares `["glb"]`.
+  URLs are not format-checked locally.
+- A `data:application/octet-stream` URI — the MIME type the API docs suggest
+  for inline models — is identified by its bytes: a GLB (glTF magic) passes,
+  anything else is refused like the file it came from.
+- The API docs say data URLs "bypass extension checks"; for inline models
   they do not.
 
 ## D-071 `meshy delete` covers everything but Creative Lab; Creative Lab "delete" is a cancel
