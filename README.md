@@ -2,7 +2,8 @@
 
 The command line for the [Meshy AI API](https://docs.meshy.ai/): text-to-3D,
 image-to-3D, text-to-motion, remesh, convert, resize, UV unwrap, rigging,
-animation, retexture, 2D images, multi-color print, Creative Lab products, plus
+animation, retexture, 2D images, printability, auto split, multi-color print,
+Creative Lab products, usage records, plus
 the local helpers a 3D-printing or agent workflow needs. Built for people and
 AI agents: a terminal gets a readable view, a pipe or an agent gets JSON.
 

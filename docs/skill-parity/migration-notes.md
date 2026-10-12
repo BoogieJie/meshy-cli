@@ -26,7 +26,7 @@ explicitly in its examples.
 | `fix_obj.py model.obj --height-mm 75` | `meshy mesh prepare-print model.obj --height-mm 75 [--output F | --in-place]` | default writes `model.print.obj`, no in-place overwrite unless asked |
 | `slicers.py detect` | `meshy slicer detect --output-schema v1` | same seven slicers + `multicolor` |
 | `slicers.py open --file F --slicer S` | `meshy slicer open --slicer S --file F --output-schema v1` | no default-app fallback; detected path only; `launch_requested` is not proof of import |
-| curl `/web/public/animations/resources?category=C` + python filter | `meshy animation-catalog list --category C --search wave` | no key, no Authorization; search is local |
+| animation catalog lookup + python filter | `meshy animation-catalog list --category C --search wave` | the documented `/animations/library` endpoint (free, needs a key); every filter is server-side (D-073) |
 | curl `/openapi/v1/showcases?...` | `meshy showcases list --search car --page-size 3 --model-format glb` | billable GET, single request, no retry |
 | curl `/openapi/v1/uv-unwrap` | `meshy uv-unwrap create --input-task-id ID` or `--model-url m.glb` | exactly one source |
 | curl `/openapi/creative-lab/{product}/v1/prototype` | `meshy creative-lab <product> prototype create --image-url photo.png [--name N] [--remove-background] [--image-subject …]` | per-product schema |
@@ -100,7 +100,9 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 ### 2.11 No automatic retries
 - Legacy troubleshooting suggested auto-retrying 429/5xx creates. The CLI never
   re-sends a billable POST or the billable showcases GET; retries are the caller's
-  decision with the recorded task/operation id.
+  decision with the recorded task/operation id. The one exception is the free
+  status GET while waiting: a 429/5xx/timeout there is retried at the next poll,
+  as the API's task-lifecycle guidance says (D-068).
 
 ### 2.12 Webhooks stay documentation
 - No webhook management endpoint exists in the frozen baseline; the CLI adds no daemon.
@@ -186,8 +188,21 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | `creative-lab … get`/`wait` while the task is IN_PROGRESS (the endpoint returns `finished_at: null`) | `server` error "unexpected task shape", HTTP 200, exit 1 on every poll until completion | parses; null timestamps/counts read as 0 (v1 view shows `null` as before); `wait` polls through | D-059 |
 | task verbs `-o` on a Creative Lab lamp build / keychain OBJ build | `model.lamp_stl`, `model.base_stl`; the OBJ ZIP bundle saved as `model.obj` | `lamp.stl`, `base.stl`, `model.obj.zip` — the same names `meshy download` uses; slot keys unchanged | D-060 |
 
+### 3.8 Changes in 0.5.0 (visible in both schemas)
+
+| Behaviour | 0.4.x | 0.5.0 | Decision |
+| --- | --- | --- | --- |
+| a 429 / 5xx / read timeout on a status request while waiting | ends the wait (`server`/`network`, exit 1/7) | retried at the next poll; an outage that outlasts `--timeout` is exit 8 with the task id | D-068 |
+| `delete` of an IN_PROGRESS task (409) | `server`, exit 1 | `conflict`, exit 14, `recovery.command` = `wait` | D-069 |
+| Creative Lab `delete` | `deleted: true` | `deleted: false, canceled: true` (the task is kept as CANCELED) | D-071 |
+| standalone text-to-3d refine | sent `texture_resolution: "4k"`, `remove_lighting: true` | sends neither unless asked (server defaults: 2k, lighting removed on meshy-6/7) | D-067 |
+| local `.stl`/`.obj`/`.fbx` for analyze/repair-printability | sent inline, refused by the API | refused locally (exit 2): pass a URL or `--input-task-id` | D-070 |
+| `animation-catalog list` | anonymous, local search, `rig_type`/`is_free` per item | needs a key, server-side filters, items as the API returns them | D-073 |
+| `balance` | `balance` only | also `monthly_credits`, `permanent_credits`, `monthly_resets_at` | D-076 |
+
 New global flags: `--output-schema`, `--api-key-file`, `--workspace`, `--no-update-check`,
 `--base-url-creative-lab`. New per-command flags on task verbs: `--save-json`,
 `--include-raw`, `--project`, `--stage`, `--operation-id`, `--stop-after-first` (make),
 `--idle-timeout` (stream). New commands: `uv-unwrap`, `creative-lab`, `animation-catalog`,
-`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`.
+`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`; in 0.5.0
+`auto-split` and `usage`.
