@@ -176,7 +176,7 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
     summary: "two-stage 3D generation from text (preview → refine)",
   },
   v1("image-to-3d", "/image-to-3d", { mediaFields: [image("image_url")], taskTypes: ["image-to-3d"], summary: "3D from a single image (standard or smart-topology low-poly)" }),
-  v1("multi-image-to-3d", "/multi-image-to-3d", { mediaFields: [image("image_urls", true)], taskTypes: ["multi-image-to-3d"], summary: "3D from multiple views (beta; prefer image-to-3d)" }),
+  v1("multi-image-to-3d", "/multi-image-to-3d", { mediaFields: [image("image_urls", true), image("texture_image_urls", true)], taskTypes: ["multi-image-to-3d"], summary: "3D from multiple views (beta; prefer image-to-3d)" }),
   v1("remesh", "/remesh", { mediaFields: [model("model_url")], taskTypes: ["remesh"], summary: "retopologize / change polycount" }),
   v1("convert", "/convert", { mediaFields: [model("model_url")], taskTypes: ["convert"], summary: "change file format only" }),
   v1("resize", "/resize", { mediaFields: [model("model_url")], taskTypes: ["resize"], summary: "resize to real-world dimensions" }),

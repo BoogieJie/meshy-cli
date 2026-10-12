@@ -96,21 +96,26 @@ running that beats starting over, which would pay for the finished step twice.
 ## At a glance
 
 ```bash
-# account
+# account: total, monthly and permanent credits, next monthly reset
 meshy-cli balance
 
 # text → 3D (sync by default: blocks until the task finishes)
 meshy-cli text-to-3d create --mode preview --prompt "a red sports car"
-meshy-cli text-to-3d create --mode refine  --preview-task-id <id>
+meshy-cli text-to-3d create --mode refine  --preview-task-id <id> --texture-resolution 4k
 
-# image → 3D
-meshy-cli image-to-3d create --image-url https://example.com/cat.png
+# image → 3D; --geometry-resolution 2k|4k runs the Ultra geometry pass (billed on top)
+meshy-cli image-to-3d create --image-url https://example.com/cat.png --geometry-resolution 2k
 
 # text → standalone motion clip (Prime/FBX by default; Swift produces BVH)
 meshy-cli text-to-motion create --prompt "a character waving" --duration 3
 
 # smart topology: component-aware low-poly with a native polycount
 meshy-cli image-to-3d create --image-url cat.png --model-type smart-topology --target-polycount 10000
+meshy-cli text-to-3d create --mode preview --prompt "a toy robot" --model-type smart-topology --target-polycount 8000
+
+# printability with a print size: also checks (analyze) or thickens (repair) thin walls
+meshy-cli analyze-printability create --input-task-id <id> --printer-type fdm --intended-print-height-mm 120
+meshy-cli multi-color-print create --input-task-id <id> --style cartoon --printer-brand prusa
 
 # multi-view → 3D: the default is a two-stage multi-view model; 2k turns on the
 # multi-view Ultra pass (+5 credits), the web app's Ultra 2K geometry setting;

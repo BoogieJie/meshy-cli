@@ -3,6 +3,7 @@
  * Converts a SUCCEEDED 3D task into a multi-color 3MF print file.
  */
 
+import { Option } from "commander";
 import { parseInt10 } from "../internal/flags.js";
 import { UsageError } from "../internal/errors.js";
 import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task-command.js";
@@ -22,7 +23,18 @@ const spec: ResourceCommandSpec = {
         )
         .option("--model-url <src>", "3D model as http(s) URL or local file path (.glb/.fbx)")
         .option("--max-colors <n>", "1-16 (default: 4)", parseInt10)
-        .option("--max-depth <n>", "quadtree depth 3-6 (default: 4)", parseInt10);
+        .addOption(
+          new Option(
+            "--style <style>",
+            "realistic (default; colours sampled from the texture) | cartoon (flat regions, smaller file; also takes vertex colours)",
+          ).choices(["realistic", "cartoon"]),
+        )
+        .option("--max-depth <n>", "realistic only: quadtree depth 3-6 (default: 4)", parseInt10)
+        .addOption(
+          new Option("--printer-brand <brand>", "slicer preset written into the 3MF (default: bambu)").choices([
+            "bambu", "anycubic", "creality", "elegoo", "flashforge", "prusa", "qidi", "snapmaker", "ankermake",
+          ]),
+        );
     },
     toPayload(opts) {
       if (!opts.inputTaskId && !opts.modelUrl && !opts.data) {
@@ -36,11 +48,16 @@ const spec: ResourceCommandSpec = {
       if (maxDepth !== undefined && (maxDepth < 3 || maxDepth > 6)) {
         throw new UsageError("--max-depth must be between 3 and 6");
       }
+      if (maxDepth !== undefined && opts.style === "cartoon") {
+        throw new UsageError("--max-depth applies to --style realistic only");
+      }
       return {
         input_task_id: opts.inputTaskId,
         model_url: opts.modelUrl,
         max_colors: maxColors,
+        style: opts.style,
         max_depth: maxDepth,
+        printer_brand: opts.printerBrand,
       };
     },
   },

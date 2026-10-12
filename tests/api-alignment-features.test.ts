@@ -234,3 +234,127 @@ test("Creative Lab keychain --name-text: up to 10 characters counted as characte
     assert.equal(api.requests.length, 1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// parameters
+// ---------------------------------------------------------------------------
+
+test("printability: --printer-type and one print size reach both endpoints; repair takes --alpha-thumbnail; two sizes or an out-of-range size are refused", async () => {
+  await withApi(accept, async (api) => {
+    const a = await runCli(["analyze-printability", "create", "--input-task-id", "t-1", "--printer-type", "sla", "--intended-print-height-mm", "120", "--async"], { env: api.env() });
+    assert.equal(a.code, 0, a.stderr);
+    assert.deepEqual(body(api, 0), { input_task_id: "t-1", printer_type: "sla", intended_print_height_mm: 120 });
+    const r = await runCli(["repair-printability", "create", "--input-task-id", "t-1", "--intended-print-longest-side-mm", "80", "--alpha-thumbnail", "true", "--async"], { env: api.env() });
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(body(api, 1), { input_task_id: "t-1", alpha_thumbnail: true, intended_print_longest_side_mm: 80 });
+    for (const extra of [["--intended-print-height-mm", "50", "--intended-print-longest-side-mm", "50"], ["--intended-print-height-mm", "0"], ["--printer-type", "resin"]]) {
+      const bad = await runCli(["repair-printability", "create", "--input-task-id", "t-1", ...extra, "--async"], { env: api.env() });
+      assert.equal(bad.code, 2, `${extra.join(" ")}: ${bad.stdout}`);
+    }
+    assert.equal(api.requests.length, 2);
+  });
+});
+
+test("multi-color-print: --style and --printer-brand; --max-depth is realistic-only", async () => {
+  await withApi(accept, async (api) => {
+    const r = await runCli(["multi-color-print", "create", "--input-task-id", "t-1", "--style", "cartoon", "--printer-brand", "prusa", "--async"], { env: api.env() });
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(body(api), { input_task_id: "t-1", style: "cartoon", printer_brand: "prusa" });
+    assert.equal((await runCli(["multi-color-print", "create", "--input-task-id", "t-1", "--style", "cartoon", "--max-depth", "5", "--async"], { env: api.env() })).code, 2);
+    assert.equal((await runCli(["multi-color-print", "create", "--input-task-id", "t-1", "--printer-brand", "makerbot", "--async"], { env: api.env() })).code, 2);
+    assert.equal(api.requests.length, 1);
+  });
+});
+
+test("images: --remove-background on both; image-to-image takes --input-task-id instead of reference images", async () => {
+  await withApi(accept, async (api) => {
+    const t = await runCli(["text-to-image", "create", "--prompt", "a cat", "--remove-background", "true", "--async"], { env: api.env() });
+    assert.equal(t.code, 0, t.stderr);
+    assert.equal(body(api, 0)["remove_background"], true);
+    const i = await runCli(["image-to-image", "create", "--prompt", "restyle as chibi", "--input-task-id", "img-1", "--remove-background", "true", "--async"], { env: api.env() });
+    assert.equal(i.code, 0, i.stderr);
+    const b = body(api, 1);
+    assert.equal(b["input_task_id"], "img-1");
+    assert.equal(b["remove_background"], true);
+    assert.ok(!("reference_image_urls" in b));
+    assert.equal((await runCli(["image-to-image", "create", "--prompt", "x", "--async"], { env: api.env() })).code, 2, "one source is still required");
+  });
+});
+
+test("balance: monthly / permanent credits and the reset time are reported (v1 and legacy)", async () => {
+  const reply = { balance: 1500, monthly_credits: 1000, permanent_credits: 500, monthly_resets_at: 1_793_404_800_000 };
+  await withApi((_req, res) => jsonReply(res, 200, reply), async (api) => {
+    const v1 = await runCli(["balance", "--output-schema", "v1"], { env: api.env() });
+    assert.equal(v1.code, 0, v1.stderr);
+    assert.deepEqual((parseSingleJson(v1.stdout) as { result: unknown }).result, { ...reply, saved_json: null });
+    const legacy = await runCli(["balance"], { env: api.env() });
+    assert.deepEqual(parseSingleJson(legacy.stdout), reply);
+    const pretty = await runCli(["balance", "--format", "pretty"], { env: api.env() });
+    assert.match(pretty.stdout, /1,000 monthly, resets 2026-10-31 · 500 permanent/);
+  });
+});
+
+test("generation: --geometry-resolution on text-to-3d preview and image-to-3d; text-to-3d smart topology; --ultra-mode still works", async () => {
+  await withApi(accept, async (api) => {
+    const t = await runCli(["text-to-3d", "create", "--mode", "preview", "--prompt", "a robot", "--geometry-resolution", "4k", "--async"], { env: api.env() });
+    assert.equal(t.code, 0, t.stderr);
+    assert.equal(body(api, 0)["geometry_resolution"], "4k");
+    const st = await runCli(["text-to-3d", "create", "--mode", "preview", "--prompt", "a robot", "--model-type", "smart-topology", "--target-polycount", "8000", "--async"], { env: api.env() });
+    assert.equal(st.code, 0, st.stderr);
+    assert.equal(body(api, 1)["model_type"], "smart-topology");
+    assert.equal(body(api, 1)["target_polycount"], 8000);
+    assert.ok(!("ai_model" in body(api, 1)), "the server picks meshy-t2 for smart-topology");
+    const i = await runCli(["image-to-3d", "create", "--image-url", "https://example.invalid/a.png", "--geometry-resolution", "2k", "--async", "--data", "{}"], { env: api.env() });
+    assert.equal(i.code, 2, "the preflight of an unreachable URL fails before the POST");
+    for (const args of [
+      ["text-to-3d", "create", "--mode", "preview", "--prompt", "x", "--model-type", "smart-topology", "--geometry-resolution", "2k"],
+      ["text-to-3d", "create", "--mode", "preview", "--prompt", "x", "--target-polycount", "500"],
+      ["text-to-3d", "create", "--mode", "preview", "--prompt", "x", "--model-type", "smart-topology", "--target-polycount", "20000"],
+      ["text-to-3d", "create", "--mode", "refine", "--preview-task-id", "p", "--geometry-resolution", "2k"],
+      ["image-to-3d", "create", "--input-task-id", "img", "--ultra-mode", "true", "--geometry-resolution", "2k"],
+      ["image-to-3d", "create", "--input-task-id", "img", "--model-type", "smart-topology", "--geometry-resolution", "4k"],
+    ]) {
+      const r = await runCli([...args, "--async"], { env: api.env() });
+      assert.equal(r.code, 2, `${args.join(" ")}: ${r.stdout}`);
+    }
+    const legacyUltra = await runCli(["image-to-3d", "create", "--input-task-id", "img", "--ultra-mode", "true", "--async"], { env: api.env() });
+    assert.equal(legacyUltra.code, 0, legacyUltra.stderr);
+    assert.equal(body(api, 2)["ultra_mode"], true);
+    const geo = await runCli(["image-to-3d", "create", "--input-task-id", "img", "--geometry-resolution", "2k", "--async"], { env: api.env() });
+    assert.equal(geo.code, 0, geo.stderr);
+    assert.equal(body(api, 3)["geometry_resolution"], "2k");
+  });
+});
+
+test("multi-image-to-3d --texture-image-urls: local files are inlined, 1-4 views, needs a textured run, not with --texture-prompt", async () => {
+  const { writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpDir } = await import("./helpers/cli.js");
+  const cwd = tmpDir("meshy-texviews-");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC", "base64");
+  for (const f of ["a.png", "front.png", "side.png"]) writeFileSync(join(cwd, f), png);
+  await withApi(accept, async (api) => {
+    const r = await runCli(["multi-image-to-3d", "create", "--image-urls", "a.png", "--should-texture", "true", "--texture-image-urls", "front.png,side.png", "--async"], { env: api.env(), cwd });
+    assert.equal(r.code, 0, r.stderr);
+    const views = body(api)["texture_image_urls"] as string[];
+    assert.equal(views.length, 2);
+    for (const v of views) assert.match(v, /^data:image\/png;base64,/);
+    for (const extra of [["--texture-image-urls", "front.png"], ["--should-texture", "true", "--texture-image-urls", "front.png", "--texture-prompt", "red"]]) {
+      const bad = await runCli(["multi-image-to-3d", "create", "--image-urls", "a.png", ...extra, "--async"], { env: api.env(), cwd });
+      assert.equal(bad.code, 2, `${extra.join(" ")}: ${bad.stdout}`);
+    }
+    assert.equal(api.requests.length, 1);
+  });
+});
+
+test("retexture / remesh --alpha-thumbnail and rigging --texture-image-url reach the wire", async () => {
+  await withApi(accept, async (api) => {
+    assert.equal((await runCli(["retexture", "create", "--input-task-id", "t", "--text-style-prompt", "gold", "--alpha-thumbnail", "true", "--async"], { env: api.env() })).code, 0);
+    assert.equal(body(api, 0)["alpha_thumbnail"], true);
+    assert.equal((await runCli(["remesh", "create", "--input-task-id", "t", "--alpha-thumbnail", "true", "--async"], { env: api.env() })).code, 0);
+    assert.equal(body(api, 1)["alpha_thumbnail"], true);
+    const tex = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC";
+    assert.equal((await runCli(["rigging", "create", "--input-task-id", "t", "--texture-image-url", tex, "--async"], { env: api.env() })).code, 0);
+    assert.equal(body(api, 2)["texture_image_url"], tex);
+  });
+});

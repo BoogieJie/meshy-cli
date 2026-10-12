@@ -72,7 +72,7 @@ test("T-002 v1 success: balance emits one six-key envelope; pretty and ndjson sh
     assert.equal(env["schema_version"], "meshy.cli/v1");
     assert.equal(env["command"], "balance");
     assert.equal(env["ok"], true);
-    assert.deepEqual(env["result"], { balance: 42, saved_json: null });
+    assert.deepEqual(env["result"], { balance: 42, monthly_credits: null, permanent_credits: null, monthly_resets_at: null, saved_json: null });
     assert.equal(env["error"], null);
     assert.deepEqual(env["warnings"], []);
     assert.equal(api.requests.length, 1);
@@ -81,7 +81,7 @@ test("T-002 v1 success: balance emits one six-key envelope; pretty and ndjson sh
     const nd = await runCli(["--output-schema", "v1", "--format", "ndjson", "balance"], { env: api.env() });
     assert.equal(nd.code, 0);
     assert.equal(nd.stdout.trim().split("\n").length, 1);
-    assert.deepEqual(JSON.parse(nd.stdout.trim())["result"], { balance: 42, saved_json: null });
+    assert.deepEqual(JSON.parse(nd.stdout.trim())["result"], { balance: 42, monthly_credits: null, permanent_credits: null, monthly_resets_at: null, saved_json: null });
 
     const pretty = await runCli(["balance", "--format", "pretty", "--output-schema", "v1"], { env: api.env() });
     assert.equal(pretty.code, 0);

@@ -56,6 +56,11 @@ const spec: ResourceCommandSpec = {
           parseBool,
         )
         .option("--texture-prompt <text>", "text guidance for texturing (max 600 chars)")
+        .option(
+          "--texture-image-urls <csv>",
+          "1-4 views of the same object to guide texturing, front first; URLs or local files; independent of --image-urls. Exclusive with --texture-prompt",
+          parseCsv,
+        )
         .addOption(
           new Option(
             "--texture-resolution <res>",
@@ -80,6 +85,7 @@ const spec: ResourceCommandSpec = {
           ["--enable-pbr", opts.enablePbr],
           ["--texture-resolution", opts.textureResolution],
           ["--texture-prompt", opts.texturePrompt],
+          ["--texture-image-urls", opts.textureImageUrls],
         ] as const) {
           if (value !== undefined) {
             throw new UsageError(
@@ -88,8 +94,16 @@ const spec: ResourceCommandSpec = {
           }
         }
       }
+      const textureViews = opts.textureImageUrls as string[] | undefined;
+      if (textureViews && (textureViews.length < 1 || textureViews.length > 4)) {
+        throw new UsageError("--texture-image-urls takes 1-4 images of the same object");
+      }
+      if (textureViews && opts.texturePrompt !== undefined) {
+        throw new UsageError("--texture-image-urls and --texture-prompt are mutually exclusive");
+      }
       return {
         image_urls: urls,
+        texture_image_urls: textureViews,
         input_task_id: opts.inputTaskId,
         geometry_resolution: opts.geometryResolution,
         should_texture: opts.shouldTexture,

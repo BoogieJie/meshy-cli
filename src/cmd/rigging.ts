@@ -20,6 +20,10 @@ const spec: ResourceCommandSpec = {
         .option("--input-task-id <id>", "source Meshy task id (takes priority over --model-url)")
         .option("--model-url <src>", "textured humanoid .glb as http(s) URL or local file path")
         .option(
+          "--texture-image-url <src>",
+          "the model's UV-unwrapped base color texture (.png; URL or local file) — for a --model-url input",
+        )
+        .option(
           "--height-meters <m>",
           "approximate character height in meters (default: 1.7) — drives bone proportions",
           parseNumber,
@@ -32,6 +36,7 @@ const spec: ResourceCommandSpec = {
       return {
         input_task_id: opts.inputTaskId,
         model_url: opts.modelUrl,
+        texture_image_url: opts.textureImageUrl,
         height_meters: opts.heightMeters,
       };
     },

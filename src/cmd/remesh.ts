@@ -6,7 +6,7 @@
  */
 
 import { Option } from "commander";
-import { parseCsv, parseInt10 } from "../internal/flags.js";
+import { parseBool, parseCsv, parseInt10 } from "../internal/flags.js";
 import { UsageError } from "../internal/errors.js";
 import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task-command.js";
 
@@ -37,7 +37,8 @@ const spec: ResourceCommandSpec = {
           new Option("--decimation-mode <level>", "adaptive 1|2|3|4; when set, overrides --target-polycount")
             .choices(["1", "2", "3", "4"]),
         )
-        .option("--target-formats <csv>", "glb,fbx,obj,usdz,blend,stl,3mf (default: glb)", parseCsv);
+        .option("--target-formats <csv>", "glb,fbx,obj,usdz,blend,stl,3mf (default: glb)", parseCsv)
+        .option("--alpha-thumbnail <bool>", "also render a transparent-background preview (alpha_thumbnail_url; default: false)", parseBool);
     },
     toPayload(opts) {
       if (!opts.inputTaskId && !opts.modelUrl && !opts.data) {
@@ -50,6 +51,7 @@ const spec: ResourceCommandSpec = {
         target_polycount: opts.targetPolycount,
         decimation_mode: opts.decimationMode == null ? undefined : Number(opts.decimationMode),
         target_formats: opts.targetFormats,
+        alpha_thumbnail: opts.alphaThumbnail,
       };
     },
     toDefaults() {

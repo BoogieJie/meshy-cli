@@ -166,12 +166,17 @@ These are API rules, not preferences — ignoring them produces failed tasks:
   `ai_model`: add `--data '{"ai_model":"meshy-7.1"}'` to pin Meshy 7.1.
 - `image-to-3d` defaults to an untextured draft mesh; `--should-texture true`
   (what `make` uses) produces a textured model in one task.
-- **The model set is not the same on every endpoint.** The image-driven
-  endpoints run Meshy 7 by default; `text-to-3d` has no Meshy 7 at all and its
-  default is still Meshy 6. `--ultra-mode` exists on `image-to-3d` alone
-  (`multi-image-to-3d` takes `--geometry-resolution 2k` instead), and
-  `retexture`'s `--multiview-image-urls` needs Meshy 7 — it takes 1-4 views of
-  **the same object**, not style references.
+- **The default model is `latest` = Meshy 7.1** on text-to-3d and image-to-3d.
+  `--geometry-resolution 2k|4k` runs the Ultra geometry pass there (text-to-3d:
+  preview only; not with smart-topology; billed on top); `--ultra-mode` on
+  image-to-3d is its deprecated spelling of `2k`. `multi-image-to-3d` takes
+  `standard|2k` only. `--model-type smart-topology` (meshy-t2, both endpoints)
+  has a native `--target-polycount` and refuses `--remove-lighting` /
+  `--image-enhancement`. `retexture`'s `--multiview-image-urls` needs Meshy 7 —
+  it takes 1-4 views of **the same object**, not style references.
+- **A standalone refine defaults to 2k textures**: 4k/8k and `--remove-lighting`
+  are refused for a meshy-6-lite preview, so pass `--texture-resolution 4k` only
+  for a meshy-6 / meshy-7.1 / latest preview (`make` does).
 
 ## Finding an animation id
 

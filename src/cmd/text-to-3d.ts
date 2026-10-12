@@ -14,7 +14,7 @@
  */
 
 import { Option } from "commander";
-import { parseBool, parseCsv } from "../internal/flags.js";
+import { parseBool, parseCsv, parseInt10 } from "../internal/flags.js";
 import { UsageError } from "../internal/errors.js";
 import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task-command.js";
 
@@ -40,6 +40,19 @@ const spec: ResourceCommandSpec = {
             "--pose-mode <pose>",
             "preview only. a-pose | t-pose pre-pose characters for rigging; auto (default) lets the model decide",
           ).choices(["a-pose", "t-pose", "auto"]),
+        )
+        .addOption(
+          new Option(
+            "--model-type <kind>",
+            "preview only. standard (default; full-detail generation) | smart-topology (meshy-t2: clean triangle topology, separated parts, native --target-polycount)",
+          ).choices(["standard", "smart-topology"]),
+        )
+        .option("--target-polycount <n>", "preview, smart-topology only: target face count, 100-15000 (server default: 4000)", parseInt10)
+        .addOption(
+          new Option(
+            "--geometry-resolution <res>",
+            "preview, standard only: standard (default) | 2k | 4k — the Ultra geometry pass at 2048³ / 4096³ (needs meshy-7.1 / latest, the default; billed on top)",
+          ).choices(["standard", "2k", "4k"]),
         )
         .option(
           "--enable-pbr <bool>",
@@ -68,12 +81,30 @@ const spec: ResourceCommandSpec = {
       if (mode === "refine" && !opts.previewTaskId) {
         throw new UsageError("--mode refine requires --preview-task-id");
       }
+      if (mode === "refine") {
+        for (const [flag, value] of [["--model-type", opts.modelType], ["--target-polycount", opts.targetPolycount], ["--geometry-resolution", opts.geometryResolution]] as const) {
+          if (value !== undefined) throw new UsageError(`${flag} applies to --mode preview only (refine inherits the preview's geometry)`);
+        }
+      }
+      const smart = opts.modelType === "smart-topology";
+      if (opts.targetPolycount !== undefined && !smart) {
+        throw new UsageError("--target-polycount applies to --model-type smart-topology only; for standard outputs chain `remesh` afterwards");
+      }
+      if (opts.targetPolycount !== undefined && ((opts.targetPolycount as number) < 100 || (opts.targetPolycount as number) > 15000)) {
+        throw new UsageError("--target-polycount must be between 100 and 15000");
+      }
+      if (smart && opts.geometryResolution !== undefined && opts.geometryResolution !== "standard") {
+        throw new UsageError("--geometry-resolution 2k/4k needs meshy-7.1 (standard); smart-topology runs meshy-t2");
+      }
       return {
         mode,
         prompt: opts.prompt,
         preview_task_id: opts.previewTaskId,
         // "auto" means "let the model decide" — the API's default, expressed by omission.
         pose_mode: opts.poseMode === "auto" ? undefined : opts.poseMode,
+        model_type: opts.modelType,
+        target_polycount: opts.targetPolycount,
+        geometry_resolution: opts.geometryResolution,
         enable_pbr: opts.enablePbr,
         texture_prompt: opts.texturePrompt,
         texture_resolution: opts.textureResolution,

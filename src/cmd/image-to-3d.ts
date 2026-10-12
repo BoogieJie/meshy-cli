@@ -45,9 +45,15 @@ const spec: ResourceCommandSpec = {
           "smart-topology only: target triangle count, 100-15000 (default: 10000). For standard outputs use remesh",
           parseInt10,
         )
+        .addOption(
+          new Option(
+            "--geometry-resolution <res>",
+            "standard mode only: standard (default) | 2k | 4k — the Ultra geometry pass at 2048³ / 4096³ for finer surface detail (needs meshy-7.1 / latest, the default; billed on top of the mesh)",
+          ).choices(["standard", "2k", "4k"]),
+        )
         .option(
           "--ultra-mode <bool>",
-          "standard mode only: extra Meshy 7 pass for finer surface detail (default: false; billed on top of the mesh)",
+          "deprecated: use --geometry-resolution 2k (true is the same pass)",
           parseBool,
         )
         .option(
@@ -95,11 +101,17 @@ const spec: ResourceCommandSpec = {
           "--target-polycount applies to --model-type smart-topology only; for standard outputs chain `remesh` afterwards",
         );
       }
-      // ultra_mode is gated on meshy-7, which only standard mode resolves to.
+      // The Ultra pass needs meshy-7.1, which only standard mode resolves to.
       if (opts.ultraMode === true && smart) {
         throw new UsageError(
-          "--ultra-mode applies to --model-type standard only (it needs meshy-7; smart-topology runs meshy-t2)",
+          "--ultra-mode applies to --model-type standard only (it needs meshy-7.1; smart-topology runs meshy-t2)",
         );
+      }
+      if (smart && opts.geometryResolution !== undefined && opts.geometryResolution !== "standard") {
+        throw new UsageError("--geometry-resolution 2k/4k applies to --model-type standard only (it needs meshy-7.1; smart-topology runs meshy-t2)");
+      }
+      if (opts.ultraMode !== undefined && opts.geometryResolution !== undefined) {
+        throw new UsageError("--ultra-mode is the deprecated spelling of --geometry-resolution 2k; pass only --geometry-resolution");
       }
       // The API rejects texture knobs on untextured runs; catch it before the wire.
       if (opts.shouldTexture !== true && !opts.data) {
@@ -121,6 +133,7 @@ const spec: ResourceCommandSpec = {
         model_type: opts.modelType,
         target_polycount: opts.targetPolycount,
         ultra_mode: opts.ultraMode,
+        geometry_resolution: opts.geometryResolution,
         should_texture: opts.shouldTexture,
         enable_pbr: opts.enablePbr,
         texture_prompt: opts.texturePrompt,

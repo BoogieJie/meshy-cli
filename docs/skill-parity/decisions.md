@@ -1037,3 +1037,21 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   keychain/fridge-magnet OBJ bundle (D-060).
 - keychain's `name_text` (engraving, prototype stage) is limited to 10
   characters counted as code points after trimming, matching the API.
+
+## D-076 New request parameters follow the existing flag conventions
+
+- API booleans on resource commands stay `--flag <bool>` (`--alpha-thumbnail`,
+  `--remove-background` on the image commands, `--connectors`); Creative Lab
+  keeps its presence flags.
+- A parameter the API documents as ignored or refused in a combination is
+  refused locally with a usage error rather than sent: `--max-depth` with
+  `--style cartoon`, text-to-3d preview-only flags on refine, `--target-polycount`
+  outside smart-topology, `--geometry-resolution 2k|4k` with smart-topology,
+  `--ultra-mode` together with `--geometry-resolution`, two print sizes at once,
+  `--texture-image-urls` with `--texture-prompt` or without `--should-texture
+  true`.
+- text-to-3d smart topology sends `model_type` only; the API picks meshy-t2
+  and its own default polycount (4,000). image-to-3d keeps its 10,000 default.
+- `balance` reports `monthly_credits`, `permanent_credits` and
+  `monthly_resets_at` (null when the API omits them); the legacy payload gains
+  them only when the API sends them.

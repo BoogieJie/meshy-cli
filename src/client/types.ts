@@ -10,6 +10,11 @@ import { z } from "zod";
 
 export const BalanceSchema = z.object({
   balance: z.number(),
+  /** Credits that expire at `monthly_resets_at`; normally balance = monthly + permanent. */
+  monthly_credits: z.number().optional(),
+  permanent_credits: z.number().optional(),
+  /** Epoch ms of the next monthly refresh; null when none is scheduled. */
+  monthly_resets_at: z.number().nullable().optional(),
 });
 export type Balance = z.infer<typeof BalanceSchema>;
 

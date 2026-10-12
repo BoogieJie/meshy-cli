@@ -58,7 +58,8 @@ const spec: ResourceCommandSpec = {
           "strip baked lighting from the base color (default: true)",
           parseBool,
         )
-        .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv);
+        .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv)
+        .option("--alpha-thumbnail <bool>", "also render a transparent-background preview (alpha_thumbnail_url; default: false)", parseBool);
     },
     toPayload(opts) {
       if (!opts.inputTaskId && !opts.modelUrl && !opts.data) {
@@ -95,6 +96,7 @@ const spec: ResourceCommandSpec = {
         texture_resolution: opts.textureResolution,
         remove_lighting: opts.removeLighting,
         target_formats: opts.targetFormats,
+        alpha_thumbnail: opts.alphaThumbnail,
       };
     },
     toDefaults(opts) {
