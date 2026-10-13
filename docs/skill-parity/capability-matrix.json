@@ -303,7 +303,7 @@
         "T-053"
       ],
       "evidence": [
-        "meshyd api_stream_handlers.go: event message (task), event error {message,status_code}, keep-alive re-emits message every 10 s",
+        "API stream: event message (task), event error {message,status_code}, keep-alive re-emits message every 10 s",
         "stream.ts SSE parser + streamTask; task-command stream (ndjson events + outcome, json envelope); tests/sse.test.ts, T-053",
         "tests/codex-review-round1.test.ts R10/F10",
         "tests/codex-review-round2.test.ts N01 (stream -o), N05 (single outcome on post-stream failures)",
@@ -521,8 +521,8 @@
         "T-020"
       ],
       "evidence": [
-        "docs.meshy.ai/en/api/uv-unwrap (input_task_id|model_url, GLB only, 40k faces, Statsig-gated 404)",
-        "meshyd server.go: /openapi/v1/uv-unwrap registers POST, GET list, GET :id, GET :id/stream, DELETE :id",
+        "docs.meshy.ai/en/api/uv-unwrap (input_task_id|model_url, GLB only, 40k faces; the API returns 404 when the endpoint is not enabled for the account)",
+        "the API serves /openapi/v1/uv-unwrap: POST, GET list, GET :id, GET :id/stream, DELETE :id",
         "src/cmd/uv-unwrap.ts: exclusive source, GLB-only, 404 reported as not_found; tests T-021"
       ],
       "intentional_differences": [],
@@ -589,7 +589,7 @@
       ],
       "evidence": [
         "docs.meshy.ai/en/api/creative-lab-lamp (image_subject; prototype model_urls.glb; build options/output stl|zip; lamp_stl/base_stl/bundle_zip)",
-        "meshyd pkg/model/task_creative_lab_lamp.go artifact keys and enums",
+        "lamp task responses: artifact keys and enums as observed from the API",
         "src/cmd/creative-lab.ts lamp: image_subject, text rejected, options/output stl|zip, include_result_json rule; tests T-022..T-025",
         "tests/codex-review-round1.test.ts R04/F08 (lamp)"
       ],
@@ -639,7 +639,7 @@
       ],
       "evidence": [
         "docs.meshy.ai/en/api/creative-lab-keychain (relief options; output glb|obj|zip; obj is a ZIP bundle)",
-        "meshyd pkg/model/task_creative_lab_keychain.go",
+        "keychain task responses as observed from the API",
         "src/cmd/creative-lab.ts keychain relief options, output glb|obj|zip; tests T-022..T-025",
         "tests/codex-review-round1.test.ts R04/F08 (keychain)"
       ],
@@ -686,7 +686,7 @@
       ],
       "evidence": [
         "docs.meshy.ai/en/api/creative-lab-fridge-magnet (own defaults: rounded-rect, 60 mm, 3.3 mm relief, 2.0 mm base)",
-        "meshyd pkg/model/task_creative_lab_fridge_magnet.go",
+        "fridge-magnet task responses as observed from the API",
         "src/cmd/creative-lab.ts fridge-magnet relief options; tests T-022..T-025",
         "tests/codex-review-round1.test.ts R04/F08 (relief options shared with keychain)"
       ],
@@ -728,7 +728,7 @@
       ],
       "evidence": [
         "Skill pipelines.md: GET /web/public/animations/resources?category=…; response {result:{total,list}}",
-        "meshyd api.go AnimationResource + ListAnimationsResourcesRequest (q, category, subCategory)",
+        "the animation catalog accepts q, category and subCategory",
         "src/cmd/animation-catalog.ts: public transport, no credential, local search; tests T-026"
       ],
       "intentional_differences": [],
@@ -760,7 +760,7 @@
       ],
       "evidence": [
         "docs.meshy.ai/en/api/enterprise-api (1 credit per request; page_size 1-10; sort_by; format; showcase_type)",
-        "meshyd api.go ListShowcasesForOpenAPIRequest: showcase_type oneof all animate static (docs say animated)",
+        "the API accepts showcase_type all|animate|static (docs say animated)",
         "src/cmd/showcases.ts: single billable GET, alias warning, no retry; tests T-027"
       ],
       "intentional_differences": [
@@ -1344,7 +1344,7 @@
         "T-082"
       ],
       "evidence": [
-        "meshyd httpapi/dto.go: public task DTO has no face_count → unknown semantics required",
+        "the API's task responses do not include face_count → unknown semantics required",
         "src/internal/inspect.ts judgeFaceCount/judgeTask + src/cmd/inspect.ts (--max-faces required; unknown exit 13; fail exit 12; remesh only described); tests/inspect.test.ts T-080..T-082"
       ],
       "intentional_differences": [

@@ -26,7 +26,7 @@ explicitly in its examples.
 | `fix_obj.py model.obj --height-mm 75` | `meshy mesh prepare-print model.obj --height-mm 75 [--output F | --in-place]` | default writes `model.print.obj`, no in-place overwrite unless asked |
 | `slicers.py detect` | `meshy slicer detect --output-schema v1` | same seven slicers + `multicolor` |
 | `slicers.py open --file F --slicer S` | `meshy slicer open --slicer S --file F --output-schema v1` | no default-app fallback; detected path only; `launch_requested` is not proof of import |
-| curl `/web/public/animations/resources?category=C` + python filter | `meshy animation-catalog list --category C --search wave` | no key, no Authorization; search is local |
+| animation catalog lookup + python filter | `meshy animation-catalog list --category C --search wave` | the documented `/animations/library` endpoint (free, needs a key); every filter is server-side (D-073) |
 | curl `/openapi/v1/showcases?...` | `meshy showcases list --search car --page-size 3 --model-format glb` | billable GET, single request, no retry |
 | curl `/openapi/v1/uv-unwrap` | `meshy uv-unwrap create --input-task-id ID` or `--model-url m.glb` | exactly one source |
 | curl `/openapi/creative-lab/{product}/v1/prototype` | `meshy creative-lab <product> prototype create --image-url photo.png [--name N] [--remove-background] [--image-subject …]` | per-product schema |
@@ -38,8 +38,8 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 
 ### 2.1 Missing `face_count` is `unknown`, not 0
 - Legacy: `task.get("face_count", 0)` then `0 > max` → prints a passing line.
-- CLI: `verdict: unknown`, exit 13, `reason: face_count missing`. Evidence: public task
-  DTO has no `face_count` (meshyd `httpapi/dto.go`, read-only 2026-09-07); Rigging docs
+- CLI: `verdict: unknown`, exit 13, `reason: face_count missing`. Evidence: the API's task
+  responses do not include `face_count` (checked 2026-09-07); Rigging docs
   only describe the server-side 300k gate.
 
 ### 2.2 OBJ transform never overwrites by default
@@ -66,7 +66,7 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 - Legacy docs generalised "textured GLB / OBJ+MTL" for every build.
 - CLI records `model_format: obj, container_format: zip, extracted: false` and saves the
   file as `.zip`; lamp parts `lamp_stl`/`base_stl`/`bundle_zip` are saved as `.stl` /
-  `.zip`. Evidence: official lamp/keychain/fridge-magnet pages and meshyd artifact keys.
+  `.zip`. Evidence: official lamp/keychain/fridge-magnet pages and the artifact keys the API returns.
 
 ### 2.6 No implicit `.env` discovery
 - Legacy: read `.env` / `.env.local` from cwd automatically.
@@ -88,8 +88,8 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
   `--data` for lamp prototypes before submission and points to `--image-url`.
 
 ### 2.9 Rigging `list`
-- CLI 0.2.0 said "Meshy does not expose a list endpoint for rigging". Official docs and
-  the server route table do; `meshy rigging list` now works. (Difference from 0.2.0,
+- CLI 0.2.0 said "Meshy does not expose a list endpoint for rigging". Official docs list
+  one and the API serves it; `meshy rigging list` now works. (Difference from 0.2.0,
   not from the Skills.)
 
 ### 2.10 Data URIs
@@ -100,7 +100,9 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 ### 2.11 No automatic retries
 - Legacy troubleshooting suggested auto-retrying 429/5xx creates. The CLI never
   re-sends a billable POST or the billable showcases GET; retries are the caller's
-  decision with the recorded task/operation id.
+  decision with the recorded task/operation id. The one exception is the free
+  status GET while waiting: a 429/5xx/timeout there is retried at the next poll,
+  as the API's task-lifecycle guidance says (D-068).
 
 ### 2.12 Webhooks stay documentation
 - No webhook management endpoint exists in the frozen baseline; the CLI adds no daemon.
@@ -186,8 +188,22 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | `creative-lab … get`/`wait` while the task is IN_PROGRESS (the endpoint returns `finished_at: null`) | `server` error "unexpected task shape", HTTP 200, exit 1 on every poll until completion | parses; null timestamps/counts read as 0 (v1 view shows `null` as before); `wait` polls through | D-059 |
 | task verbs `-o` on a Creative Lab lamp build / keychain OBJ build | `model.lamp_stl`, `model.base_stl`; the OBJ ZIP bundle saved as `model.obj` | `lamp.stl`, `base.stl`, `model.obj.zip` — the same names `meshy download` uses; slot keys unchanged | D-060 |
 
+### 3.8 Changes in 0.4.2 (visible in both schemas)
+
+| Behaviour | 0.4.1 and earlier | 0.4.2 | Decision |
+| --- | --- | --- | --- |
+| a 429 / 5xx / read timeout on a status request while waiting | ends the wait (`server`/`network`, exit 1/7) | retried at the next poll; an outage that outlasts `--timeout` is exit 8 with the task id | D-068 |
+| `delete` of an IN_PROGRESS task (409) | `server`, exit 1 | `conflict`, exit 14, `recovery.command` = the resource's `wait` (top-level `delete`: `recovery` without a command) | D-069 |
+| v1 `resources`: the `delete` entry | kind `local`, `endpoint: null` | kind `action`, `endpoint: "/openapi/v2/text-to-3d"`; `counts.action` added | D-077 |
+| Creative Lab `delete` | `deleted: true` | `deleted: false, canceled: true` (the task is kept as CANCELED) | D-071 |
+| standalone text-to-3d refine | sent `texture_resolution: "4k"`, `remove_lighting: true` | sends neither unless asked (server defaults: 2k, lighting removed on meshy-6/7) | D-067 |
+| local `.stl`/`.obj`/`.fbx` for remesh, convert, resize, retexture, multi-color-print, analyze/repair-printability | sent inline, refused by the API (or stored under the wrong format) | refused locally (exit 2): pass a URL or `--input-task-id`; `.glb`/`.gltf` unchanged (multi-color-print: `.glb`) | D-070 |
+| `animation-catalog list` | anonymous, local search (name / key / sub-category); result had `fetched`, `total`, `authenticated`, `search_scope: "local"`; items had `rig_type` / `is_free` / `is_default` | needs a key; server-side filters (`--search` matches name / key, `--sub-category` filters); result has `count`, `filters`, `search_scope: "server"`; items as the API returns them | D-073 |
+| `balance` | `balance` only | also `monthly_credits`, `permanent_credits`, `monthly_resets_at` | D-076 |
+
 New global flags: `--output-schema`, `--api-key-file`, `--workspace`, `--no-update-check`,
 `--base-url-creative-lab`. New per-command flags on task verbs: `--save-json`,
 `--include-raw`, `--project`, `--stage`, `--operation-id`, `--stop-after-first` (make),
 `--idle-timeout` (stream). New commands: `uv-unwrap`, `creative-lab`, `animation-catalog`,
-`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`.
+`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`; in 0.4.2
+`auto-split` and `usage`.

@@ -41,15 +41,15 @@ export interface PollDeviceTokenOpts {
 
 /**
  * Thrown when the /oauth/device_authorization endpoint returns 404.
- * Indicates the meshyd deployment does not support device flow yet.
+ * Indicates the API deployment does not support device flow yet.
  */
 export class DeviceFlowNotSupportedError extends HintedError {
   constructor() {
     super({
-      // Do NOT suggest --manual here: a meshyd old enough to lack
+      // Do NOT suggest --manual here: an API deployment old enough to lack
       // device_authorization also lacks the OOB display branch that --manual
       // depends on, so that flag would fail too. Only safe options are to
-      // wait for the backend deployment or use an API key.
+      // wait for a newer API deployment or use an API key.
       message:
         "This Meshy API host does not support device login yet — retry after backend deployment or use an API key (meshy auth login --with-key).",
       code: "device_flow_not_supported",

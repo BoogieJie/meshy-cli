@@ -188,7 +188,6 @@ test("T-028 --data merge: flags beat JSON, JSON beats defaults, explicit false/0
       preview_task_id: "p1",
       enable_pbr: false, // --data switches a default off
       texture_resolution: "2k", // typed flag wins over --data
-      remove_lighting: true, // untouched default
       target_formats: ["obj", "fbx"], // array replaced wholesale
       seed: 0, // explicit 0 kept
     });

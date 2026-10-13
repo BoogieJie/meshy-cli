@@ -22,6 +22,7 @@ import { animateCommand } from "./cmd/animate.js";
 import { animationCatalogCommand } from "./cmd/animation-catalog.js";
 import { apiCommand } from "./cmd/api.js";
 import { authCommand } from "./cmd/auth.js";
+import { autoSplitCommand } from "./cmd/auto-split.js";
 import { balanceCommand } from "./cmd/balance.js";
 import { convertCommand } from "./cmd/convert.js";
 import { creativeLabCommand } from "./cmd/creative-lab.js";
@@ -47,6 +48,7 @@ import { slicerCommand } from "./cmd/slicer.js";
 import { textTo3dCommand } from "./cmd/text-to-3d.js";
 import { textToImageCommand } from "./cmd/text-to-image.js";
 import { textToMotionCommand } from "./cmd/text-to-motion.js";
+import { usageCommand } from "./cmd/usage.js";
 import { uvUnwrapCommand } from "./cmd/uv-unwrap.js";
 
 /**
@@ -64,6 +66,8 @@ export const V1_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "mesh",
   "slicer",
   "doctor",
+  "auto-split",
+  "usage",
 ]);
 
 /**
@@ -78,7 +82,6 @@ export const LOCAL_COMMANDS: ReadonlySet<string> = new Set([
   "slicer",
   "doctor",
   "download",
-  "animation-catalog",
   REFRESH_COMMAND,
 ]);
 
@@ -100,7 +103,7 @@ EXAMPLES:
     meshy resources                                # index of every command
     meshy text-to-3d create --mode preview --prompt "a red sports car"
     meshy image-to-3d get <task-id>
-    meshy delete <task-id>                         # unified: works for any task
+    meshy delete <task-id>                         # any task except Creative Lab
 
     # escape hatch for endpoints without a dedicated subcommand
     meshy api GET /balance
@@ -206,6 +209,8 @@ export function buildRootCommand(): Command {
     meshCommand,
     slicerCommand,
     doctorCommand,
+    autoSplitCommand,
+    usageCommand,
   ]) {
     program.addCommand(cmd, { hidden: true });
   }

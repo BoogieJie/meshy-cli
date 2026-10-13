@@ -55,14 +55,13 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   base, relative path, supported verbs, billing and media fields. `docs/skill-parity/
   endpoint-contracts.json` documents the same data and a test asserts they agree.
 - 0.2.0 marked `rigging list` unsupported. The official rigging page lists
-  `GET /openapi/v1/rigging` and the server route table registers it, so `list` is
+  `GET /openapi/v1/rigging` and the API serves it, so `list` is
   enabled. Recorded as an intentional difference from 0.2.0, not from the Skills.
 
 ## D-007 `showcases --showcase-type animated` is sent as `animate`
 
-- The public docs and the Skill reference say `all | animated | static`; the server
-  binding (checked read-only, meshyd `ListShowcasesForOpenAPIRequest`) accepts
-  `all | animate | static` and would reject `animated` with 400.
+- The public docs and the Skill reference say `all | animated | static`; the API
+  accepts `all | animate | static` and would reject `animated` with 400.
 - The CLI accepts both spellings, sends `animate`, and adds a warning
   `showcase_type_alias` so the translation is visible. Live verification is not_run.
 
@@ -76,8 +75,7 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
 
 ## D-009 `face_count` is unknown unless the server sends it
 
-- The public task DTO has no `face_count` field (meshyd `httpapi/dto.go`, read-only
-  check). `inspect faces --resource … --task-id …` therefore usually yields
+- The API's task responses do not include `face_count`. `inspect faces --resource … --task-id …` therefore usually yields
   `verdict: unknown`, exit 13. The legacy `check-faces` defaulted a missing value to 0
   and printed a passing line for a model it never measured; that is not reproduced.
 - `--task-json` files that carry `face_count` (e.g. saved tasks from a future server
@@ -921,3 +919,159 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   free. Add a view in `views.ts` only when its payload has URLs, timestamps or a
   list shape. A view must return `null` for a payload it does not recognise,
   never a guess.
+
+
+## D-067 Refine pins only what every refine target accepts
+
+- Refine inherits its model from the preview, and the text-to-3d task GET does
+  not return `ai_model`. The API refuses `remove_lighting` on a refine whose
+  model cannot honour it, and `texture_resolution` 4k/8k on a model without HD
+  textures — so a meshy-6-lite preview answered every default refine with 400.
+- The standalone refine therefore pins `enable_pbr: true` and GLB output only.
+  Omitting `remove_lighting` changes nothing on meshy-6/7: the API's default
+  there is lighting removal on. Omitting `texture_resolution` gives the API's
+  2k; ask for 4k with the flag.
+- `make` keeps 4k and `remove_lighting: true`: it created the preview itself
+  without `ai_model`, so it knows the preview runs on `latest`. Its resume and
+  pending-step commands now carry `--texture-resolution 4k` so a resumed chain
+  produces what an uninterrupted one would.
+
+## D-068 A failed status request is retried at the next tick; `Retry-After` paces polling
+
+- The API docs' task-lifecycle guidance: a failed status request (timeout,
+  429, 5xx) does not mean the task failed — try again at the next poll; the
+  poll interval is the `Retry-After` header when present. The API sends it on
+  task reads and on 429.
+- `pollUntilTerminal` retries a `TransportError` in the connect/request/body/
+  timeout phases and any HTTP 429 or 5xx, sleeping `Retry-After` when sent and
+  the local backoff otherwise, never past the deadline. A refused redirect,
+  4xx other than 429, and a malformed task still end the wait at once.
+- The outcome says what happened: `result.wait.failed_polls`,
+  `result.wait.last_poll_error` and a `poll_retried` warning; an outage that
+  outlasts `--timeout` is `timed_out` (exit 8) naming the last failure, never a
+  bare `server` error. `--timeout 0` stays a single query that reports its
+  failure as-is.
+- The default budget stays 600 s (resumable with `wait`); the help and docs
+  now say the API advises waiting up to 60 minutes and how to ask for it.
+
+## D-069 409 is `conflict`, exit 14
+
+- The API answers `DELETE` of an IN_PROGRESS task with 409 (credits for a
+  started task are not refundable). It used to fall through to `server`,
+  exit 1, which reads as "the server broke".
+- `conflict` is a new error code with its own exit code, 14 — appended, so no
+  existing code moves. The task `delete` verbs attach `recovery.command` (the
+  resource's `wait`). The top-level `delete` does not know the resource, so its
+  `recovery` is `{action: "wait"}` with no command: a `recovery.command` is
+  always runnable verbatim, and a `<resource>` placeholder is not.
+- The hint does not say "delete again". A running task cannot be stopped and
+  its credits are spent; deleting it once it finishes is permanent and refunds
+  nothing, so waiting is for the result, and a later delete is only for a user
+  who wants the result gone.
+
+## D-070 Inline models are glTF only
+
+- The API accepts an inline (`data:`) model only as glTF (`model/gltf-binary`,
+  `model/gltf+json`); `model/obj` and `model/stl` data URIs are refused, and an
+  FBX cannot travel as a data URI (as `application/octet-stream` it is taken
+  for a GLB). The CLI sends every local file inline, so a local
+  `.stl`/`.obj`/`.fbx` was a 400 after the round trip — or a task built on the
+  wrong format. The API has no upload endpoint to use instead.
+- Every model input except the GLB-only ones (rigging, uv-unwrap) now declares
+  `formats: ["glb", "gltf"]` with a `formatsHint` naming the alternatives (an
+  http(s) URL, which the API fetches and checks itself, or `--input-task-id`):
+  remesh, convert, resize, retexture, analyze/repair-printability.
+  multi-color-print takes only GLB or FBX at all, so it declares `["glb"]`.
+  URLs are not format-checked locally.
+- A `data:application/octet-stream` URI — the MIME type the API docs suggest
+  for inline models — is identified by its bytes: a GLB (glTF magic) passes,
+  anything else is refused like the file it came from.
+- The API docs say data URLs "bypass extension checks"; for inline models
+  they do not.
+
+## D-071 `meshy delete` covers everything but Creative Lab; Creative Lab "delete" is a cancel
+
+- The shared `DELETE /openapi/v2/text-to-3d/:id` accepts a task of any
+  resource except Creative Lab, which it answers with 404 (those products have
+  their own per-stage DELETE). The help, the `resources` index and the root
+  help now say so, and a 404 names the Creative Lab command.
+- The per-product Creative Lab DELETE does not delete: it moves PENDING or
+  IN_PROGRESS to `CANCELED` (refunding PENDING only) and refuses a finished
+  task with 400. Its verb now reports `canceled: true, deleted: false`.
+
+## D-072 The animation task type is `animate`
+
+- The API reports animation tasks as `type: "animate"`; the registry said
+  `"animation"`, so `download --task-json` could not match a saved animation
+  task to its resource.
+
+## D-073 The animation catalog is the documented library endpoint
+
+- `animation-catalog list` now calls `GET /openapi/v1/animations/library`, the
+  endpoint the API docs publish for this purpose: free, authenticated, a
+  complete list, with server-side `search` (name or key), exact `category` and
+  `sub_category`, and `action_ids` lookups. D-008's local search is gone, and
+  so is the anonymous transport it needed.
+- Items are passed through as the API returns them (`action_id`, `name`, `key`,
+  `category`, `sub_category`, `preview_url`); `rig_type`, `is_default` and
+  `is_free` are no longer reported, because the public endpoint does not
+  return them. `result.search_scope` is `"server"`; `fetched`, `total` and
+  `authenticated` are dropped.
+- The command now needs a credential and is no longer a local command for the
+  update check.
+
+## D-074 Auto Split and Usage are v1-only commands
+
+- `auto-split` is a task resource on `/print/split` with the full verb set;
+  `usage tasks` is a one-page query on `/usage/tasks`. Both are new, so both
+  speak only the v1 envelope (as D-002 did for the S1 commands).
+- Auto Split's connector tuning without `--connectors true` is refused rather
+  than sent to be ignored, and `by_parts` / `by_color` without a prompt fail
+  before the request. Thin-wall reinforcement after a cut is always on in the
+  API and has no flag.
+
+## D-075 More Creative Lab products, and one without stages
+
+- vinyl-figure and brick-figure follow figure (no build options); keycap's
+  build needs the prototype's `candidate_id` and takes `head_size_mm` /
+  `vertical_offset_mm` / `base_model` options; fidget-pixel's prototype needs
+  `type` and takes no `remove_background`, and its build takes board options
+  and `output.format` 3mf. Every option range the API documents is checked
+  before the request, as for the existing products.
+- fidget-collapsible has no prototype/build pair: one POST on the product
+  root. It is registered as `creative-lab.fidget-collapsible` with
+  `creativeLab.stage: null`, commanded as `meshy creative-lab
+  fidget-collapsible <verb>`; the two-stage list (`CREATIVE_LAB_PRODUCTS`) stays
+  two-stage only.
+- keycap's `model_urls.obj_zip` is a ZIP bundle, named `model.obj.zip` like the
+  keychain/fridge-magnet OBJ bundle (D-060).
+- keychain's `name_text` (engraving, prototype stage) is limited to 10
+  characters counted as code points after trimming, matching the API.
+
+## D-076 New request parameters follow the existing flag conventions
+
+- API booleans on resource commands stay `--flag <bool>` (`--alpha-thumbnail`,
+  `--remove-background` on the image commands, `--connectors`); Creative Lab
+  keeps its presence flags.
+- A parameter the API documents as ignored or refused in a combination is
+  refused locally with a usage error rather than sent: `--max-depth` with
+  `--style cartoon`, text-to-3d preview-only flags on refine, `--target-polycount`
+  outside smart-topology, `--geometry-resolution 2k|4k` with smart-topology,
+  `--ultra-mode` together with `--geometry-resolution`, two print sizes at once,
+  `--texture-image-urls` with `--texture-prompt` or without `--should-texture
+  true`.
+- Smart topology sends `model_type` without `ai_model` (the API picks
+  meshy-t2) and `target_polycount` 10,000 unless asked otherwise, on text-to-3d
+  as on image-to-3d: the rigging-friendly count image-to-3d already used,
+  instead of the API's 4,000, so the two commands default alike.
+- `balance` reports `monthly_credits`, `permanent_credits` and
+  `monthly_resets_at` (null when the API omits them); the legacy payload gains
+  them only when the API sends them.
+
+## D-077 `delete` is an `action` in the resources index
+
+- The v1 `resources` index listed the top-level `delete` as kind `local` with
+  `endpoint: null`, which reads as an offline helper. It is a destructive API
+  call. It is now kind `action` (a one-off API call that changes state) with
+  its endpoint, and `counts` gains `action`. The entry keeps its keys and its
+  place at the end of `items`.

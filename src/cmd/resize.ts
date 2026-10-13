@@ -20,7 +20,7 @@ const spec: ResourceCommandSpec = {
     configure(cmd) {
       return cmd
         .option("--input-task-id <id>", "source Meshy task id (takes priority over --model-url)")
-        .option("--model-url <src>", "3D model as http(s) URL or local file path")
+        .option("--model-url <src>", "3D model: an http(s) URL (.glb/.gltf/.obj/.fbx/.stl) or a local .glb/.gltf file — the API takes inline uploads as glTF only, so host .stl/.obj/.fbx at a URL")
         .option("--resize-height <m>", "target height in meters (one sizing mode required)", parseNumber)
         .option("--resize-longest-side <m>", "target longest dimension in meters", parseNumber)
         .option("--auto-size <bool>", "AI-estimate the real-world size", parseBool)

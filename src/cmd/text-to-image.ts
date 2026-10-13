@@ -37,7 +37,8 @@ const spec: ResourceCommandSpec = {
             "t-pose",
           ]),
         )
-        .addOption(new Option("--aspect-ratio <ratio>", ASPECT_RATIO_HELP).choices([...ASPECT_RATIOS]));
+        .addOption(new Option("--aspect-ratio <ratio>", ASPECT_RATIO_HELP).choices([...ASPECT_RATIOS]))
+        .option("--remove-background <bool>", "return a transparent RGBA PNG with the background removed (default: false)", parseBool);
     },
     toPayload(opts) {
       if (!opts.prompt && !opts.data) {
@@ -57,6 +58,7 @@ const spec: ResourceCommandSpec = {
         generate_multi_view: opts.generateMultiView,
         pose_mode: opts.poseMode,
         aspect_ratio: opts.aspectRatio,
+        remove_background: opts.removeBackground,
       };
     },
     toDefaults() {

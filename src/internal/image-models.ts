@@ -2,8 +2,7 @@
  * Shared model/aspect-ratio table for the 2D image commands, so text-to-image
  * and image-to-image can't drift apart as Meshy ships new models.
  *
- * The ratio rules mirror the server's own per-model check
- * (meshyd pkg/server/api_image_generation_handlers.go): every GPT Image model
+ * The ratio rules mirror the API's own per-model check: every GPT Image model
  * accepts all seven ratios; the nano-banana family rejects 3:2 and 2:3.
  */
 

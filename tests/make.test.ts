@@ -79,7 +79,7 @@ test("resume is offered only where a hand-off exists", () => {
 
   assert.equal(
     resumeCommand(text, "task-1", runtimeWith()),
-    "meshy text-to-3d create --mode refine --preview-task-id task-1",
+    "meshy text-to-3d create --mode refine --texture-resolution 4k --preview-task-id task-1",
   );
   // -o rides along so the resumed step still lands the artifacts on disk.
   assert.match(resumeCommand(text, "task-1", runtimeWith("out/car/")) ?? "", / -o out\/car\/$/);

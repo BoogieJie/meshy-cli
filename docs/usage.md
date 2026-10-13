@@ -96,26 +96,30 @@ running that beats starting over, which would pay for the finished step twice.
 ## At a glance
 
 ```bash
-# account
+# account: total, monthly and permanent credits, next monthly reset
 meshy-cli balance
 
 # text → 3D (sync by default: blocks until the task finishes)
 meshy-cli text-to-3d create --mode preview --prompt "a red sports car"
-meshy-cli text-to-3d create --mode refine  --preview-task-id <id>
+meshy-cli text-to-3d create --mode refine  --preview-task-id <id> --texture-resolution 4k
 
-# image → 3D
-meshy-cli image-to-3d create --image-url https://example.com/cat.png
+# image → 3D; --geometry-resolution 2k|4k runs the Ultra geometry pass (billed on top)
+meshy-cli image-to-3d create --image-url https://example.com/cat.png --geometry-resolution 2k
 
 # text → standalone motion clip (Prime/FBX by default; Swift produces BVH)
 meshy-cli text-to-motion create --prompt "a character waving" --duration 3
 
 # smart topology: component-aware low-poly with a native polycount
 meshy-cli image-to-3d create --image-url cat.png --model-type smart-topology --target-polycount 10000
+meshy-cli text-to-3d create --mode preview --prompt "a toy robot" --model-type smart-topology --target-polycount 8000
 
-# multi-view → 3D: the default is a two-stage multi-view model; 2k turns on the
-# multi-view Ultra pass (+5 credits), the web app's Ultra 2K geometry setting;
-# the Ultra model follows ai_model, so pin Meshy 7.1 through --data
-meshy-cli multi-image-to-3d create --image-urls front.png,side.png,back.png --geometry-resolution 2k --data '{"ai_model":"meshy-7.1"}'
+# printability with a print size: also checks (analyze) or thickens (repair) thin walls
+meshy-cli analyze-printability create --input-task-id <id> --printer-type fdm --intended-print-height-mm 120
+meshy-cli multi-color-print create --input-task-id <id> --style cartoon --printer-brand prusa
+
+# multi-view → 3D (Meshy 7.1 by default); 2k turns on the Ultra pass (+5 credits),
+# the web app's Ultra 2K geometry setting
+meshy-cli multi-image-to-3d create --image-urls front.png,side.png,back.png --geometry-resolution 2k
 
 # fire-and-forget (--async): exactly one POST, returns the task_id, query later
 TASK=$(meshy-cli text-to-image create --prompt "mountain landscape" --async --output-schema v1 | jq -r .result.submission.task_id)
@@ -129,8 +133,16 @@ meshy creative-lab figure prototype create --image-url ./photo.png --name demo -
 meshy creative-lab figure build create --input-task-id <prototype-id> --async
 meshy creative-lab lamp build create --input-task-id <id> --model-format zip --options '{"diameter_mm":180}'
 
-# public animation catalog (no key) and Enterprise showcases (billed per request)
+# animation library (free; server-side search), several clips in one file, a text-to-motion clip
 meshy animation-catalog list --category DailyActions --search wave
+meshy animate create --rig-task-id <rig-id> --action-ids 10,25,92
+meshy animate create --rig-task-id <rig-id> --motion-task-id <text-to-motion-id>
+
+# split a model into printable parts; usage records (Studio/Enterprise)
+meshy auto-split create --input-task-id <id> --mode by_parts --prompt "head, torso, legs" --connectors true
+meshy usage tasks --start-time 2026-08-01T00:00:00Z --endpoints image-to-3d --page-size 100
+
+# Enterprise showcases (billed per request)
 meshy showcases list --search car --page-size 3 --model-format glb
 
 # local helpers (no key, no network)
@@ -199,7 +211,7 @@ local commands with their kind.
 | `resize` | `/resize` | [docs](https://docs.meshy.ai/en/api/resize) |
 | `uv-unwrap` | `/uv-unwrap` | [docs](https://docs.meshy.ai/en/api/uv-unwrap) |
 | `rigging` | `/rigging` | [docs](https://docs.meshy.ai/en/api/rigging) |
-| `animate` | `/animations` | [docs](https://docs.meshy.ai/en/api/animations) |
+| `animate` | `/animations` | [docs](https://docs.meshy.ai/en/api/animation) |
 | `text-to-motion` | `/text-to-motion` | [docs](https://docs.meshy.ai/en/api/text-to-motion) |
 | `retexture` | `/retexture` | [docs](https://docs.meshy.ai/en/api/retexture) |
 | `text-to-image` | `/text-to-image` | [docs](https://docs.meshy.ai/en/api/text-to-image) |
@@ -207,8 +219,11 @@ local commands with their kind.
 | `multi-color-print` | `/print/multi-color` | [docs](https://docs.meshy.ai/en/api/multi-color-print) |
 | `analyze-printability` | `/print/analyze` | [docs](https://docs.meshy.ai/en/api/analyze-printability) |
 | `repair-printability` | `/print/repair` | [docs](https://docs.meshy.ai/en/api/repair-printability) |
-| `creative-lab <product> prototype\|build` | `/openapi/creative-lab/<product>/v1/<stage>` | [figure](https://docs.meshy.ai/en/api/creative-lab-figure) · [lamp](https://docs.meshy.ai/en/api/creative-lab-lamp) · [keychain](https://docs.meshy.ai/en/api/creative-lab-keychain) · [fridge-magnet](https://docs.meshy.ai/en/api/creative-lab-fridge-magnet) |
-| `animation-catalog list` | `GET /web/public/animations/resources` (no key) | [docs](https://docs.meshy.ai/en/api/animations) |
+| `auto-split` | `/print/split` | [docs](https://docs.meshy.ai/en/api/auto-split) |
+| `creative-lab <product> prototype\|build` | `/openapi/creative-lab/<product>/v1/<stage>` | [figure](https://docs.meshy.ai/en/api/creative-lab-figure) · [vinyl-figure](https://docs.meshy.ai/en/api/creative-lab-vinyl-figure) · [brick-figure](https://docs.meshy.ai/en/api/creative-lab-brick-figure) · [lamp](https://docs.meshy.ai/en/api/creative-lab-lamp) · [keychain](https://docs.meshy.ai/en/api/creative-lab-keychain) · [fridge-magnet](https://docs.meshy.ai/en/api/creative-lab-fridge-magnet) · [keycap](https://docs.meshy.ai/en/api/creative-lab-keycap) · [fidget-pixel](https://docs.meshy.ai/en/api/creative-lab-fidget-pixel) |
+| `creative-lab fidget-collapsible` | `/openapi/creative-lab/fidget-collapsible/v1` | [docs](https://docs.meshy.ai/en/api/creative-lab-fidget-collapsible) |
+| `animation-catalog list` | `GET /animations/library` (free) | [docs](https://docs.meshy.ai/en/api/animation#list-animations) |
+| `usage tasks` | `GET /usage/tasks` (Studio/Enterprise; free) | [docs](https://docs.meshy.ai/en/api/usage) |
 | `showcases list` | `GET /showcases` (Enterprise; every request is billed) | [docs](https://docs.meshy.ai/en/api/enterprise-api) |
 
 Per-resource actions (all single-HTTP-call except `wait`/`stream`):
@@ -226,26 +241,58 @@ Top-level shortcut:
 
 ```
 meshy-cli delete <task-id>
-    # Meshy's DELETE is unified across resources, but GET is not, so
-    # `get`/`wait`/`stream` live only on their resource.
+    # The shared DELETE accepts a task of any resource except Creative Lab, but
+    # GET is per resource, so `get`/`wait`/`stream` live only on their resource.
 ```
+
+Delete is permanent. A PENDING task is deleted and refunded. An IN_PROGRESS
+one cannot be stopped and its credits are spent: the API refuses it (409) and
+the CLI reports `conflict`, exit `14`, with the resource's `wait` command (none
+from the top-level `delete`, which does not know the resource) to get the
+result. A finished task is deleted without a refund, so delete it only if the
+result should be gone. Creative Lab tasks are reached only through
+`meshy creative-lab <product> <stage> delete`, and that one **cancels**: the
+task stays, as `CANCELED` (PENDING refunded, IN_PROGRESS not, a finished task
+refused), and the result says `canceled: true`, `deleted: false`.
 
 `create` is **synchronous by default** — it polls until the task reaches a
 terminal status (`SUCCEEDED` / `FAILED` / `CANCELED`) or `--timeout` hits.
 Pass `--async` to return the `task_id` immediately; then call
 `<resource> get <id>`, `wait <id>` or `stream <id>` when you need the result.
 
+Polling follows the API's [task lifecycle](https://docs.meshy.ai/en/api/task-lifecycle)
+guidance: the interval is the server's `Retry-After` when it sends one, and a
+status request that fails with a `429`, a `5xx`, a read timeout or a dropped
+connection is retried at the next tick — it says nothing about the task. A
+`401`, `404` or malformed task still ends the wait at once. The default
+`--timeout` is 600 s, shorter than the "at least 60 minutes from `created_at`"
+the docs recommend: when it runs out the task keeps running, the error (exit
+`8`) carries the task id, and `wait <id>` resumes. Pass `--timeout 3600` to
+wait the whole hour in one go.
+
 ### Creative Lab
 
-Four products (`figure`, `lamp`, `keychain`, `fridge-magnet`), each with a
-`prototype` stage (photo → styled concept image; the lamp prototype also yields
-a lampshade GLB) and a `build` stage that consumes a SUCCEEDED prototype created
-through this API with the same key. Build options are validated per product
-before anything is sent: lamp `--options` (diameter, thickness, light-source
-preset, rotations …) with `--model-format stl|zip`; keychain and fridge-magnet
-relief options with `--model-format glb|obj|zip` — their `obj` output is a ZIP
-bundle and is saved as `.zip`; figure has no options. Prototypes made in the
-web app are rejected by the server (404).
+Eight two-stage products (`figure`, `vinyl-figure`, `brick-figure`, `lamp`,
+`keychain`, `fridge-magnet`, `keycap`, `fidget-pixel`), each with a `prototype`
+stage (photo → concept image; the lamp prototype also yields a lampshade GLB)
+and a `build` stage that consumes a SUCCEEDED prototype created through this API
+with the same key. Build options are validated per product before anything is
+sent: lamp `--options` (diameter, thickness, light-source preset, rotations …)
+with `--model-format stl|zip`; keychain and fridge-magnet relief options with
+`--model-format glb|obj|zip` — their `obj` output is a ZIP bundle and is saved
+as `.zip`; keycap `--candidate-id` (from the prototype's `candidate_ids`) and
+`--options` (`head_size_mm`, `vertical_offset_mm`), delivering a GLB and an OBJ
+bundle (`model.obj.zip`) at real-world millimetres; fidget-pixel `--options`
+(`shape`, `grid_size` 16|32, `piece_size_mm`, `color_count`, `piece_height_mm`)
+and a 3MF board. The fidget-pixel prototype needs `--type person|other`; the
+keychain prototype takes `--name-text` (up to 10 characters, engraved; the build
+inherits it). The figure-style products have no build options. Prototypes made
+in the web app are rejected by the server (404).
+
+`fidget-collapsible` has a single stage:
+`meshy creative-lab fidget-collapsible create --image-url ./photo.png` →
+a printable STL (plus a preview GLB when available), with the same
+get/list/wait/stream/delete verbs.
 
 ## Saving artifacts with `-o` (legacy) and `meshy download` (selective)
 
@@ -366,7 +413,12 @@ accept:
 
 Missing files and 4xx/5xx preflights exit with code `2` and a flag-prefixed
 message before any task is created. GLB-only fields (`uv-unwrap`, `rigging`
-`--model-url`) reject other formats locally.
+`--model-url`) reject other formats locally. Every other `--model-url`
+(remesh, convert, resize, retexture, analyze/repair-printability) takes an
+inline model — a local file or a `data:` URI — as glTF only, `.glb` or `.gltf`
+(multi-color-print: `.glb`); the API refuses inline STL/OBJ/FBX, so host those
+at an http(s) URL or pass `--input-task-id`. A `data:application/octet-stream`
+URI is accepted when its bytes are a GLB.
 
 ## Global flags
 

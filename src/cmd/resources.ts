@@ -7,7 +7,7 @@
  * callers need and points here for the rest.
  *
  * legacy: the 0.2.0 array of `{name, summary}` (new commands appended).
- * v1:     `result.items` with `kind` (task | query | local), the command line,
+ * v1:     `result.items` with `kind` (task | query | action | local), the command line,
  *         the endpoint and the supported verbs — all generated from the
  *         registry and filtered to what this build actually registers.
  */
@@ -26,7 +26,7 @@ interface ResourceEntry {
 export const RESOURCES: ResourceEntry[] = [
   { name: "text-to-3d", summary: "two-stage 3D generation from text (preview → refine)" },
   { name: "image-to-3d", summary: "3D from a single image (standard or smart-topology low-poly)" },
-  { name: "multi-image-to-3d", summary: "3D from multiple views (beta; prefer image-to-3d)" },
+  { name: "multi-image-to-3d", summary: "3D from 1-4 views of one object (prefer image-to-3d for a single image)" },
   { name: "remesh", summary: "retopologize / change polycount" },
   { name: "convert", summary: "change file format only" },
   { name: "resize", summary: "resize to real-world dimensions" },
@@ -40,11 +40,11 @@ export const RESOURCES: ResourceEntry[] = [
   { name: "analyze-printability", summary: "inspect a model for 3D-printing issues (free)" },
   { name: "repair-printability", summary: "fix non-watertight / non-manifold geometry" },
   { name: "balance", summary: "remaining credit balance" },
-  { name: "delete", summary: "delete any task, whatever its resource" },
+  { name: "delete", summary: "delete a task of any resource except Creative Lab (whose own delete verb cancels)" },
   // Added in S1 (appended so 0.2.0 consumers keep their positions).
   { name: "uv-unwrap", summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" },
-  { name: "creative-lab", summary: "photo → printable product: figure | lamp | keychain | fridge-magnet (prototype then build)" },
-  { name: "animation-catalog", summary: "public animation library (action ids); no key needed" },
+  { name: "creative-lab", summary: "photo → printable product: figure | vinyl-figure | brick-figure | lamp | keychain | fridge-magnet | keycap | fidget-pixel (prototype then build) | fidget-collapsible (one stage)" },
+  { name: "animation-catalog", summary: "animation library (action ids for animate); free, server-side search" },
   { name: "showcases", summary: "Enterprise community showcases (every request is billed)" },
   { name: "download", summary: "download selected assets of a task (saved task JSON, URL, or API)" },
   { name: "project", summary: "meshy_output project folders: init | record | show | list | rebuild-index" },
@@ -52,6 +52,8 @@ export const RESOURCES: ResourceEntry[] = [
   { name: "mesh", summary: "prepare-print: OBJ Y-up → Z-up, scale to height, centre, ground at Z=0" },
   { name: "slicer", summary: "detect installed slicers | open a model in one" },
   { name: "doctor", summary: "local environment diagnosis (no network by default)" },
+  { name: "auto-split", summary: "split a model into printable parts (auto / by named parts / by colour; optional connectors)" },
+  { name: "usage", summary: "usage tasks: finished API tasks with the credits each consumed (Studio/Enterprise)" },
 ];
 
 const VERBS = `Every task resource carries the same verbs:
@@ -91,7 +93,7 @@ export const resourcesCommand = new Command("resources")
     const byKind = (kind: ResourceIndexEntry["kind"]) => items.filter((e) => e.kind === kind).length;
     await emitResult(opened, legacy, {
       items,
-      counts: { task: byKind("task"), query: byKind("query"), local: byKind("local") },
+      counts: { task: byKind("task"), query: byKind("query"), action: byKind("action"), local: byKind("local") },
       verbs_help: "meshy resources --help",
     });
   });

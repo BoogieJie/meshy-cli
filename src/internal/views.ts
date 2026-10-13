@@ -263,7 +263,12 @@ function dirName(name: string | undefined, taskId: string): string {
 
 function balanceView(body: unknown): string | null {
   if (!isObj(body) || typeof body["balance"] !== "number") return null;
-  return `Balance  ${body["balance"].toLocaleString("en-US")} credits`;
+  const line = `Balance  ${body["balance"].toLocaleString("en-US")} credits`;
+  const monthly = body["monthly_credits"];
+  const permanent = body["permanent_credits"];
+  if (typeof monthly !== "number" || typeof permanent !== "number") return line;
+  const resets = typeof body["monthly_resets_at"] === "number" ? `, resets ${new Date(body["monthly_resets_at"]).toISOString().slice(0, 10)}` : "";
+  return `${line}\n         ${monthly.toLocaleString("en-US")} monthly${resets} · ${permanent.toLocaleString("en-US")} permanent`;
 }
 
 const CHECK_STYLE: Record<string, { icon: string; style: Style }> = {

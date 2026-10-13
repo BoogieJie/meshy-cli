@@ -11,6 +11,7 @@
  *   - lamp build: `lamp_stl` / `base_stl` are STL files, `bundle_zip` is a ZIP;
  *   - keychain / fridge-magnet build: `model_urls.obj` is a ZIP bundle
  *     (model.obj + model.mtl + texture.png), delivered as `.zip`, unextracted;
+ *   - keycap build: `model_urls.obj_zip` is the same kind of bundle;
  *   - motion clips carry their format in `result.motion_format`.
  */
 
@@ -78,6 +79,9 @@ export function modelAsset(fmtKey: string, url: string, product: string | null):
       return { key, kind: "model", url, format: "stl", containerFormat: null, modelFormat: "stl", sourcePath, filename: "base.stl", dependencies: [], notes: { part: "fixture_base" } };
     case "bundle_zip":
       return { key, kind: "model", url, format: "zip", containerFormat: "zip", modelFormat: null, sourcePath, filename: "bundle.zip", dependencies: [], notes: { extracted: false } };
+    case "obj_zip":
+      // keycap build: model.obj + model.mtl + the textures it references, zipped.
+      return { key, kind: "model", url, format: "zip", containerFormat: "zip", modelFormat: "obj", sourcePath, filename: "model.obj.zip", dependencies: [], notes: { extracted: false } };
     case "pre_remeshed_glb":
       return { key, kind: "model", url, format: "glb", containerFormat: null, modelFormat: "glb", sourcePath, filename: "model.pre_remeshed.glb", dependencies: [] };
     default: {

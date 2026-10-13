@@ -1,5 +1,6 @@
 /**
- * balance — one-shot GET /balance
+ * balance — one-shot GET /balance: the total, and its split into monthly
+ * credits (expiring at monthly_resets_at) and permanent credits.
  */
 
 import { Command } from "commander";
@@ -15,5 +16,16 @@ export const balanceCommand = new Command("balance")
     const runtime = await buildRuntime(opened.flags);
     const { balance, raw } = await runtime.client.balance.getWithRaw();
     const saved = opts.saveJson ? saveRawJson(opts.saveJson, raw, { workspace: opened.flags.workspaceRoot }) : null;
-    await emitResult(opened, balance, { balance: balance.balance, saved_json: saved }, { legacyFile: opened.flags.output });
+    await emitResult(
+      opened,
+      balance,
+      {
+        balance: balance.balance,
+        monthly_credits: balance.monthly_credits ?? null,
+        permanent_credits: balance.permanent_credits ?? null,
+        monthly_resets_at: balance.monthly_resets_at ?? null,
+        saved_json: saved,
+      },
+      { legacyFile: opened.flags.output },
+    );
   });

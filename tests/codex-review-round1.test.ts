@@ -312,42 +312,47 @@ test("R05/F01 --save-json: an existing target is refused before the POST; a fail
 });
 
 test("R06/F01 sync create: a 503 while polling keeps the created id, submission and resume commands; exactly one POST", async () => {
+  // A 503 on a status request is retried at the next tick, so an
+  // outage that outlasts --timeout ends as a timeout (exit 8), still naming the task.
   const api = await startMockApi((req, res) => (req.method === "POST" ? jsonReply(res, 200, { result: "accepted-before-get-error" }) : jsonReply(res, 503, { message: "synthetic temporary outage" })));
   try {
-    const r = await runCli(CREATE.filter((a) => a !== "--async"), { env: api.env() });
-    assert.equal(r.code, 1, `${r.stderr}\n${r.stdout}`);
-    const out = parseSingleJson(r.stdout) as { ok: boolean; error: { code: string; http_status: number }; result: { task: unknown; task_id: string; submission: { state: string; task_id: string }; next: { wait: string }; wait: { polls: number } } };
+    const r = await runCli([...CREATE.filter((a) => a !== "--async"), "--timeout", "1"], { env: api.env() });
+    assert.equal(r.code, 8, `${r.stderr}\n${r.stdout}`);
+    const out = parseSingleJson(r.stdout) as { ok: boolean; error: { code: string; message: string }; result: { task: unknown; task_id: string; submission: { state: string; task_id: string }; next: { wait: string }; wait: { polls: number; failed_polls: number; last_poll_error: { http_status: number } } } };
     assert.equal(out.ok, false);
-    assert.equal(out.error.code, "server");
-    assert.equal(out.error.http_status, 503);
+    assert.equal(out.error.code, "timed_out");
+    assert.match(out.error.message, /503/);
     assert.equal(out.result.task_id, "accepted-before-get-error");
     assert.equal(out.result.submission.state, "accepted");
     assert.equal(out.result.submission.task_id, "accepted-before-get-error");
     assert.match(out.result.next.wait, /wait accepted-before-get-error/);
     assert.equal(out.result.wait.polls, 0);
-    assert.deepEqual(api.requests.map((q) => q.method), ["POST", "GET"]);
+    assert.equal(out.result.wait.last_poll_error.http_status, 503);
+    assert.equal(api.requests.filter((q) => q.method === "POST").length, 1);
+    assert.ok(api.requests.filter((q) => q.method === "GET").length >= 2, "the 503 was retried");
     // The same for a bare `wait`, and for the legacy schema.
-    const w = await runCli(["text-to-3d", "wait", "some-task", "--output-schema", "v1"], { env: api.env() });
-    assert.equal(w.code, 1, w.stderr);
+    const w = await runCli(["text-to-3d", "wait", "some-task", "--timeout", "1", "--output-schema", "v1"], { env: api.env() });
+    assert.equal(w.code, 8, w.stderr);
     assert.equal((parseSingleJson(w.stdout) as { result: { task_id: string } }).result.task_id, "some-task");
-    const legacy = await runCli(CREATE.filter((a) => a !== "--async" && a !== "--output-schema" && a !== "v1"), { env: api.env() });
-    assert.equal(legacy.code, 1, legacy.stderr);
-    const lp = parseSingleJson(legacy.stdout) as { code: string; result: { task_id: string } };
-    assert.equal(lp.code, "server");
-    assert.equal(lp.result.task_id, "accepted-before-get-error");
+    const legacy = await runCli([...CREATE.filter((a) => a !== "--async" && a !== "--output-schema" && a !== "v1"), "--timeout", "1"], { env: api.env() });
+    assert.equal(legacy.code, 8, legacy.stderr);
+    const lp = parseSingleJson(legacy.stdout) as { id: string; timed_out: boolean };
+    assert.equal(lp.id, "accepted-before-get-error");
+    assert.equal(lp.timed_out, true);
   } finally {
     await api.close();
   }
 });
 
 test("F01 make: a polling failure after step 1 was accepted keeps executed steps, the task id and the resume command", async () => {
-  const api = await startMockApi((req, res) => (req.method === "POST" ? jsonReply(res, 200, { result: "prev-accepted" }) : jsonReply(res, 503, { message: "outage" })));
+  // A 503 is retried; a 401 that appears mid-poll still ends the wait at once.
+  const api = await startMockApi((req, res) => (req.method === "POST" ? jsonReply(res, 200, { result: "prev-accepted" }) : jsonReply(res, 401, { message: "key revoked" })));
   try {
     const r = await runCli(["make", "a fixture cactus", "--output-schema", "v1"], { env: api.env() });
-    assert.equal(r.code, 1, `${r.stderr}\n${r.stdout}`);
+    assert.equal(r.code, 3, `${r.stderr}\n${r.stdout}`);
     const out = parseSingleJson(r.stdout) as { error: { code: string; http_status: number }; result: { task_id: string; executed: Array<{ task_id: string }>; submission: { state: string }; next: { wait: string } } };
-    assert.equal(out.error.code, "server");
-    assert.equal(out.error.http_status, 503);
+    assert.equal(out.error.code, "auth");
+    assert.equal(out.error.http_status, 401);
     assert.equal(out.result.task_id, "prev-accepted");
     assert.equal(out.result.executed[0]!.task_id, "prev-accepted");
     assert.equal(out.result.submission.state, "accepted");

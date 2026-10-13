@@ -5,12 +5,10 @@
  *   v1 / v2       bearer credential, resolved by config
  *   creative-lab  bearer credential; base derived from the v1 origin or given
  *                 explicitly; a stored profile is never sent to another origin
- *   public-web    no credential (animation catalog)
  */
 
 import { BalanceEndpoint } from "./endpoints/balance.js";
 import { TaskEndpoint } from "./endpoints/base.js";
-import { AnimationCatalogEndpoint } from "./endpoints/animation-catalog.js";
 import { ShowcasesEndpoint } from "./endpoints/showcases.js";
 import {
   creativeLabResource,
@@ -31,8 +29,6 @@ export class MeshyClient {
   readonly config: MeshyConfig;
   readonly balance: BalanceEndpoint;
   readonly showcases: ShowcasesEndpoint;
-  /** Public catalog — built on a transport without any credential. */
-  readonly catalog: AnimationCatalogEndpoint;
 
   private readonly v1: Transport;
   private readonly v2: Transport;
@@ -44,10 +40,13 @@ export class MeshyClient {
     const common = { readTimeoutMs: config.readTimeoutMs, fetchImpl: opts.fetchImpl, credentialKind: config.credentialKind };
     this.v1 = createTransport({ ...common, baseUrl: config.baseUrlV1, apiKey: config.apiKey });
     this.v2 = createTransport({ ...common, baseUrl: config.baseUrlV2, apiKey: config.apiKey });
-    const publicTransport = createTransport({ baseUrl: config.publicWebBase, readTimeoutMs: config.readTimeoutMs, fetchImpl: opts.fetchImpl });
     this.balance = new BalanceEndpoint((path, init) => this.v1.fetchRaw(path, init));
     this.showcases = new ShowcasesEndpoint(this.v1);
-    this.catalog = new AnimationCatalogEndpoint(publicTransport);
+  }
+
+  /** One authenticated GET on the v1 family for the list-shaped queries (usage, animation library). */
+  async getV1(path: string, query: Record<string, string | number | undefined>, extras: { signal?: AbortSignal } = {}): Promise<unknown> {
+    return (await this.v1.requestJson("GET", path, { query, signal: extras.signal })).json;
   }
 
   private transportFor(base: ApiBase): Transport {

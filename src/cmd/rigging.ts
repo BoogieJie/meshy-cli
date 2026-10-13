@@ -1,6 +1,5 @@
 /**
  * rigging — https://docs.meshy.ai/en/api/rigging
- * Note: Meshy does not expose a list endpoint for rigging.
  */
 
 import { parseNumber } from "../internal/flags.js";
@@ -14,13 +13,16 @@ const spec: ResourceCommandSpec = {
     "character as GLB + FBX plus bundled walking and running animations at no extra cost. " +
     "Input must be GLB with under 300k faces — remesh to ~10000 first if denser. Not suitable " +
     "for non-humanoid assets or models with unclear limb structure",
-  supportsList: false,
   create: {
     description: "Create a rigging task",
     configure(cmd) {
       return cmd
         .option("--input-task-id <id>", "source Meshy task id (takes priority over --model-url)")
         .option("--model-url <src>", "textured humanoid .glb as http(s) URL or local file path")
+        .option(
+          "--texture-image-url <src>",
+          "the model's UV-unwrapped base color texture (.png; URL or local file) — for a --model-url input",
+        )
         .option(
           "--height-meters <m>",
           "approximate character height in meters (default: 1.7) — drives bone proportions",
@@ -34,6 +36,7 @@ const spec: ResourceCommandSpec = {
       return {
         input_task_id: opts.inputTaskId,
         model_url: opts.modelUrl,
+        texture_image_url: opts.textureImageUrl,
         height_meters: opts.heightMeters,
       };
     },

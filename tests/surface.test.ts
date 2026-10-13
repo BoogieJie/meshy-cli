@@ -39,9 +39,9 @@ test("deprecated and relocated flags are gone from the generation commands", () 
     assert.ok(!flags.has("--origin-at"), `${resource} still has --origin-at`);
     assert.ok(!flags.has("--moderation"), `${resource} still has --moderation`);
   }
-  // Exception: smart-topology's polycount is native to image-to-3d.
+  // Exception: smart-topology's polycount is native to image-to-3d and text-to-3d.
   assert.ok(createFlags("image-to-3d").has("--target-polycount"));
-  assert.ok(!createFlags("text-to-3d").has("--target-polycount"));
+  assert.ok(createFlags("text-to-3d").has("--target-polycount"));
   assert.ok(!createFlags("multi-image-to-3d").has("--target-polycount"));
 });
 
@@ -84,14 +84,15 @@ test("image-to-3d gained the smart-topology surface and task chaining", () => {
 });
 
 test("the mode is the model: no model flag on the 3D generation commands", () => {
-  // After culling meshy-5/meshy-t1, each mode has exactly one model
-  // (standard → meshy-7, smart-topology → meshy-t2), so --ai-model is gone
-  // from 3D generation — the 2D image commands keep theirs. text-to-3d also
-  // lost --model-type (lowpoly was the t1-era engine).
+  // Each mode has exactly one model (standard → meshy-7.1 via latest,
+  // smart-topology → meshy-t2), so --ai-model is gone from 3D generation —
+  // the 2D image commands keep theirs. text-to-3d's --model-type offers the
+  // two modes only (lowpoly was the t1-era engine and stays out).
   for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d"]) {
     assert.ok(!createFlags(resource).has("--ai-model"), `${resource} still has --ai-model`);
   }
-  assert.ok(!createFlags("text-to-3d").has("--model-type"), "text-to-3d still has --model-type");
+  const modeType = sub(sub(root, "text-to-3d"), "create").options.find((o) => o.long === "--model-type");
+  assert.deepEqual(modeType?.argChoices, ["standard", "smart-topology"]);
   for (const resource of ["text-to-image", "image-to-image"]) {
     assert.ok(createFlags(resource).has("--ai-model"), `${resource} lost --ai-model`);
   }
@@ -152,9 +153,9 @@ test("2D image commands default to gpt-image-2 and share the aspect-ratio surfac
   }
 });
 
-test("rigging carries no texture flag and documents its bundled animations", () => {
+test("rigging takes the documented base color texture and documents its bundled animations", () => {
   const flags = createFlags("rigging");
-  assert.ok(!flags.has("--texture-image-url"));
+  assert.ok(flags.has("--texture-image-url"));
   assert.match(sub(root, "rigging").description(), /walking and running/i);
 });
 
@@ -206,4 +207,17 @@ test("generation commands default target_formats to glb instead of every format"
     assert.ok(flag, `${resource} is missing --target-formats`);
     assert.match(flag?.description ?? "", /default: glb/, resource);
   }
+});
+
+test("help text matches the current API: 800-character prompts, Meshy 7.1 default, emission only on meshy-6, fresh UVs by default", () => {
+  const help = (resource: string, flag: string) => sub(sub(root, resource), "create").options.find((o) => o.long === flag)?.description ?? "";
+  assert.match(help("text-to-3d", "--prompt"), /max 800 chars/);
+  for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d"]) {
+    assert.match(help(resource, "--texture-prompt"), /max 800 chars/, resource);
+  }
+  for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d", "retexture"]) {
+    assert.match(help(resource, "--enable-pbr"), /emission map on meshy-6/, resource);
+  }
+  assert.match(help("image-to-3d", "--model-type"), /meshy-7\.1/);
+  assert.match(help("retexture", "--enable-original-uv"), /default: false/);
 });

@@ -8,6 +8,7 @@ export type MeshyErrorCode =
   | "credit"
   | "not_found"
   | "rate_limit"
+  | "conflict"
   | "server"
   | "network";
 
@@ -18,6 +19,8 @@ export class MeshyApiError extends Error {
   readonly body?: unknown;
   /** Set when the credential kind is known at the call site — used to tailor the 401 hint. */
   readonly credentialKind?: "oauth" | "api_key";
+  /** The server's `Retry-After`, in ms, when the response carried one (429, 503). */
+  readonly retryAfterMs?: number;
 
   constructor(params: {
     message: string;
@@ -26,6 +29,7 @@ export class MeshyApiError extends Error {
     path?: string;
     body?: unknown;
     credentialKind?: "oauth" | "api_key";
+    retryAfterMs?: number;
   }) {
     super(params.message);
     this.name = "MeshyApiError";
@@ -34,6 +38,7 @@ export class MeshyApiError extends Error {
     this.path = params.path;
     this.body = params.body;
     this.credentialKind = params.credentialKind;
+    if (params.retryAfterMs !== undefined) this.retryAfterMs = params.retryAfterMs;
   }
 
   toJSON(): Record<string, unknown> {
@@ -53,6 +58,7 @@ export function codeForStatus(status: number): MeshyErrorCode {
   if (status === 401) return "auth";
   if (status === 402) return "credit";
   if (status === 404) return "not_found";
+  if (status === 409) return "conflict";
   if (status === 429) return "rate_limit";
   return "server";
 }
@@ -80,6 +86,18 @@ async function extractMessage(resp: Response): Promise<{ msg: string; body: unkn
   }
 }
 
+/**
+ * `Retry-After` in ms: delta-seconds (what the API sends) or an HTTP date.
+ * Absent, unparseable or in the past → undefined.
+ */
+export function parseRetryAfter(value: string | null | undefined, now = Date.now()): number | undefined {
+  if (!value) return undefined;
+  const text = value.trim();
+  if (/^\d+(\.\d+)?$/.test(text)) return Math.round(Number(text) * 1000);
+  const at = Date.parse(text);
+  return Number.isFinite(at) && at > now ? at - now : undefined;
+}
+
 export async function mapHttpError(
   resp: Response,
   path?: string,
@@ -95,5 +113,6 @@ export async function mapHttpError(
     path: where,
     body,
     credentialKind,
+    retryAfterMs: parseRetryAfter(resp.headers.get("retry-after")),
   });
 }

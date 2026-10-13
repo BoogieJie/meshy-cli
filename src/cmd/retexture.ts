@@ -29,7 +29,7 @@ const spec: ResourceCommandSpec = {
     configure(cmd) {
       return cmd
         .option("--input-task-id <id>", "source Meshy task id (takes priority over --model-url)")
-        .option("--model-url <src>", "3D model as http(s) URL or local file path (.glb/.gltf/.obj/.fbx/.stl)")
+        .option("--model-url <src>", "3D model: an http(s) URL (.glb/.gltf/.obj/.fbx/.stl) or a local .glb/.gltf file — the API takes inline uploads as glTF only, so host .stl/.obj/.fbx at a URL")
         .option("--text-style-prompt <text>", "text style description; mutually exclusive with --image-style-url")
         .option(
           "--image-style-url <src>",
@@ -40,10 +40,10 @@ const spec: ResourceCommandSpec = {
           "1-4 views of the SAME object as CSV, first entry is the front reference; each is a URL or local file path. Mutually exclusive with the two style flags",
           parseCsv,
         )
-        .option("--enable-original-uv <bool>", "reuse the model's original UVs (default: true)", parseBool)
+        .option("--enable-original-uv <bool>", "keep the model's existing UV layout — true suits Meshy outputs and models with good UVs (default: false, fresh UVs)", parseBool)
         .option(
           "--enable-pbr <bool>",
-          "generate normal/metallic/roughness/emission maps (default: true, so game-engine imports carry the full map set)",
+          "generate normal/metallic/roughness maps, plus an emission map on meshy-6 below 8k (default: true, so game-engine imports carry the full map set)",
           parseBool,
         )
         .addOption(
@@ -58,7 +58,8 @@ const spec: ResourceCommandSpec = {
           "strip baked lighting from the base color (default: true)",
           parseBool,
         )
-        .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv);
+        .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv)
+        .option("--alpha-thumbnail <bool>", "also render a transparent-background preview (alpha_thumbnail_url; default: false)", parseBool);
     },
     toPayload(opts) {
       if (!opts.inputTaskId && !opts.modelUrl && !opts.data) {
@@ -95,6 +96,7 @@ const spec: ResourceCommandSpec = {
         texture_resolution: opts.textureResolution,
         remove_lighting: opts.removeLighting,
         target_formats: opts.targetFormats,
+        alpha_thumbnail: opts.alphaThumbnail,
       };
     },
     toDefaults(opts) {

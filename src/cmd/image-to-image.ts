@@ -18,8 +18,8 @@ import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task
 const spec: ResourceCommandSpec = {
   name: "image-to-image",
   description:
-    "Instruction-driven image editing and generation from 1-5 reference images — extraction, " +
-    "transformation, combination, restyling",
+    "Instruction-driven image editing and generation from 1-5 reference images (or a previous " +
+    "image task's output) — extraction, transformation, combination, restyling",
   create: {
     description: "Create an image-to-image task",
     configure(cmd) {
@@ -33,23 +33,31 @@ const spec: ResourceCommandSpec = {
         )
         .option(
           "--reference-image-urls <csv>",
-          "required — 1-5 reference images as CSV; each entry is a URL or local file path",
+          "1-5 reference images as CSV; each entry is a URL or local file path (required unless --input-task-id)",
           parseCsv,
+        )
+        .option(
+          "--input-task-id <id>",
+          "alternative to --reference-image-urls: a SUCCEEDED text-to-image or image-to-image task whose output images become the references (takes priority)",
         )
         .option(
           "--generate-multi-view <bool>",
           "generate multi-angle views of the subject; mutually exclusive with --aspect-ratio",
           parseBool,
         )
-        .addOption(new Option("--aspect-ratio <ratio>", ASPECT_RATIO_HELP).choices([...ASPECT_RATIOS]));
+        .addOption(new Option("--aspect-ratio <ratio>", ASPECT_RATIO_HELP).choices([...ASPECT_RATIOS]))
+        .option("--remove-background <bool>", "return a transparent RGBA PNG with the background removed (default: false)", parseBool);
     },
     toPayload(opts) {
       if (!opts.prompt && !opts.data) {
         throw new UsageError("--prompt is required");
       }
       const urls = opts.referenceImageUrls as string[] | undefined;
-      if ((!urls || urls.length < 1 || urls.length > 5) && !opts.data) {
+      if (urls && (urls.length < 1 || urls.length > 5)) {
         throw new UsageError("--reference-image-urls must be a CSV of 1-5 URLs");
+      }
+      if (!urls && !opts.inputTaskId && !opts.data) {
+        throw new UsageError("provide --reference-image-urls (CSV of 1-5) or --input-task-id");
       }
       checkImageCombo({
         // With --data in play an unset flag may be supplied there; leave the
@@ -63,8 +71,10 @@ const spec: ResourceCommandSpec = {
         ai_model: opts.aiModel,
         prompt: opts.prompt,
         reference_image_urls: urls,
+        input_task_id: opts.inputTaskId,
         generate_multi_view: opts.generateMultiView,
         aspect_ratio: opts.aspectRatio,
+        remove_background: opts.removeBackground,
       };
     },
     toDefaults() {

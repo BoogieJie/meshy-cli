@@ -53,7 +53,7 @@ test("every documented task resource exists in the registry with the same routin
   }
 });
 
-test("query resources agree with the documentation and the catalog carries no credential", () => {
+test("query resources agree with the documentation", () => {
   for (const d of docs.query_resources) {
     const q = QUERY_RESOURCES.find((x) => x.id === d.id);
     assert.ok(q, `registry is missing query ${d.id}`);
@@ -62,11 +62,11 @@ test("query resources agree with the documentation and the catalog carries no cr
     assert.equal(q.relativePath, d.relativePath);
     assert.equal(q.auth, d.auth);
   }
-  assert.equal(QUERY_RESOURCES.find((q) => q.id === "animation-catalog")?.auth, "none");
+  assert.equal(QUERY_RESOURCES.find((q) => q.id === "animation-catalog")?.relativePath, "/animations/library");
   assert.equal(QUERY_RESOURCES.find((q) => q.id === "showcases")?.billing, "may-charge");
 });
 
-test("Creative Lab: 4 products × 2 stages, exact paths, no path built from user strings (T-022, T-023)", () => {
+test("Creative Lab: every two-stage product × 2 stages, exact paths, no path built from user strings (T-022, T-023)", () => {
   for (const product of CREATIVE_LAB_PRODUCTS) {
     for (const stage of ["prototype", "build"] as const) {
       const r = creativeLabResource(product, stage);
@@ -78,11 +78,15 @@ test("Creative Lab: 4 products × 2 stages, exact paths, no path built from user
       assert.equal(r.mediaFields.length, stage === "prototype" ? 1 : 0);
     }
   }
-  for (const [p, s] of [["../figure", "prototype"], ["figure", "../build"], ["https://evil.example/", "build"], ["figure prototype", "build"], ["Figure", "prototype"], ["", "prototype"], ["keycap", "build"]]) {
+  for (const [p, s] of [["../figure", "prototype"], ["figure", "../build"], ["https://evil.example/", "build"], ["figure prototype", "build"], ["Figure", "prototype"], ["", "prototype"], ["teapot", "build"], ["fidget-collapsible", "build"]]) {
     assert.equal(creativeLabResource(p!, s!), undefined, `${p}/${s} must not resolve`);
   }
   assert.equal(taskResourceByCommandPath(["creative-lab", "lamp", "build"])?.id, "creative-lab.lamp.build");
   assert.equal(taskResourceByCommandPath(["creative-lab", "lamp"]), undefined);
+  // The one single-stage product sits on the product root.
+  const fidget = taskResourceByCommandPath(["creative-lab", "fidget-collapsible"]);
+  assert.equal(fidget?.legacyEndpoint, "/openapi/creative-lab/fidget-collapsible/v1");
+  assert.equal(fidget?.creativeLab?.stage, null);
 });
 
 test("legacy routing facts: animate → /animations, text-to-3d on v2, rigging list enabled", () => {
@@ -95,7 +99,11 @@ test("legacy routing facts: animate → /animations, text-to-3d on v2, rigging l
 test("resourceIndex classifies every entry and never invents a verb", () => {
   const idx = resourceIndex();
   const kinds = new Set(idx.map((e) => e.kind));
-  assert.deepEqual([...kinds].sort(), ["local", "query", "task"]);
+  assert.deepEqual([...kinds].sort(), ["action", "local", "query", "task"]);
+  // delete reaches the API and is destructive: never listed as an offline helper.
+  const del = idx.find((e) => e.name === "delete");
+  assert.equal(del?.kind, "action");
+  assert.equal(del?.endpoint, "/openapi/v2/text-to-3d");
   for (const e of idx.filter((x) => x.kind === "task")) {
     assert.deepEqual(e.verbs, ["create", "get", "list", "wait", "stream", "delete"]);
     assert.match(e.command, /^meshy /);
