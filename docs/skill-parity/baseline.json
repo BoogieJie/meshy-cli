@@ -25,20 +25,16 @@
       "claude_manifest_version": "0.4.1",
       "usage": "read-only capability baseline; not modified"
     },
-    "meshyd_read_only_crosscheck": {
-      "commit": "69b7ff5dd29f7a75a3220987985037ecb5c13c2e",
-      "files_consulted": [
-        "pkg/server/server.go (public route registration: every task API group registers POST '', GET '', GET /:id, GET /:id/stream, DELETE /:id; openapi /v1/showcases; /web/public/animations/resources)",
-        "pkg/server/api_stream_handlers.go (SSE: event 'message' carries task DTO; event 'error' carries {message,status_code}; keep-alive re-emits 'message' every 10s; stream closes after terminal status)",
-        "pkg/server/internal/httpapi/response.go (APIStreamErrorResponse = {message, status_code})",
-        "pkg/server/internal/httpapi/dto.go (task DTO: model_urls object keys glb/fbx/gltf/usdz/obj/mtl/vox/blend/stl/3mf/pre_remeshed_glb; thumbnail_urls is an object keyed by view; alpha_thumbnail_url; consumed_credits optional; no face_count field)",
-        "pkg/server/creativelab/openapi_routes.go + api_creative_lab_{figure,lamp,keychain,fridge_magnet}_handlers.go (request structs)",
-        "pkg/model/task_creative_lab_{lamp,keychain,fridge_magnet}.go (options/output enums, artifact keys)",
-        "pkg/server/api.go (ListShowcasesForOpenAPIRequest: format oneof glb fbx usdz obj; showcase_type oneof all animate static; GetShowcaseForOpenAPIResult fields; ListAnimationsResourcesRequest: q/category/subCategory; AnimationResource fields)"
+    "api_behaviour_crosscheck": {
+      "observed": [
+        "every task resource answers POST '', GET '', GET /:id, GET /:id/stream and DELETE /:id; showcases are served at /openapi/v1/showcases; the Skill's animation catalog at /web/public/animations/resources",
+        "Server-Sent Events: event 'message' carries the task; event 'error' carries {message, status_code}; a keep-alive re-emits 'message' every 10 s; the stream closes after a terminal status",
+        "task responses: model_urls keys glb/fbx/gltf/usdz/obj/mtl/vox/blend/stl/3mf/pre_remeshed_glb; thumbnail_urls is an object keyed by view; alpha_thumbnail_url; consumed_credits optional; no face_count field",
+        "Creative Lab figure/lamp/keychain/fridge-magnet request fields, option and output enums, artifact keys",
+        "showcases accept format glb|fbx|usdz|obj and showcase_type all|animate|static; the animation catalog accepts q, category and subCategory"
       ],
       "notes": [
-        "internal source copies are not included in this repository",
-        "production deployment state, account gates and billing were not tested"
+        "account availability and billing were not tested"
       ]
     }
   },

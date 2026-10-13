@@ -38,8 +38,8 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 
 ### 2.1 Missing `face_count` is `unknown`, not 0
 - Legacy: `task.get("face_count", 0)` then `0 > max` → prints a passing line.
-- CLI: `verdict: unknown`, exit 13, `reason: face_count missing`. Evidence: public task
-  DTO has no `face_count` (meshyd `httpapi/dto.go`, read-only 2026-09-07); Rigging docs
+- CLI: `verdict: unknown`, exit 13, `reason: face_count missing`. Evidence: the API's task
+  responses do not include `face_count` (checked 2026-09-07); Rigging docs
   only describe the server-side 300k gate.
 
 ### 2.2 OBJ transform never overwrites by default
@@ -66,7 +66,7 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 - Legacy docs generalised "textured GLB / OBJ+MTL" for every build.
 - CLI records `model_format: obj, container_format: zip, extracted: false` and saves the
   file as `.zip`; lamp parts `lamp_stl`/`base_stl`/`bundle_zip` are saved as `.stl` /
-  `.zip`. Evidence: official lamp/keychain/fridge-magnet pages and meshyd artifact keys.
+  `.zip`. Evidence: official lamp/keychain/fridge-magnet pages and the artifact keys the API returns.
 
 ### 2.6 No implicit `.env` discovery
 - Legacy: read `.env` / `.env.local` from cwd automatically.
@@ -88,8 +88,8 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
   `--data` for lamp prototypes before submission and points to `--image-url`.
 
 ### 2.9 Rigging `list`
-- CLI 0.2.0 said "Meshy does not expose a list endpoint for rigging". Official docs and
-  the server route table do; `meshy rigging list` now works. (Difference from 0.2.0,
+- CLI 0.2.0 said "Meshy does not expose a list endpoint for rigging". Official docs list
+  one and the API serves it; `meshy rigging list` now works. (Difference from 0.2.0,
   not from the Skills.)
 
 ### 2.10 Data URIs

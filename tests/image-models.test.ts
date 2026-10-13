@@ -49,7 +49,7 @@ test("checkImageCombo — multi-view excludes aspect-ratio", () => {
 });
 
 test("checkImageCombo — every GPT Image model accepts every aspect ratio the flag offers", () => {
-  // Mirrors meshyd: the server's per-model check lets gpt-image-2 and both 2.5
+  // Mirrors the API: its per-model check lets gpt-image-2 and both 2.5
   // tiers through for 1:1/16:9/9:16/4:3/3:4/3:2/2:3 (verified live: gpt-image-2
   // + 4:3 is accepted with 202).
   for (const model of GPT_IMAGE_MODELS) {

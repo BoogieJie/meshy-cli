@@ -55,14 +55,13 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   base, relative path, supported verbs, billing and media fields. `docs/skill-parity/
   endpoint-contracts.json` documents the same data and a test asserts they agree.
 - 0.2.0 marked `rigging list` unsupported. The official rigging page lists
-  `GET /openapi/v1/rigging` and the server route table registers it, so `list` is
+  `GET /openapi/v1/rigging` and the API serves it, so `list` is
   enabled. Recorded as an intentional difference from 0.2.0, not from the Skills.
 
 ## D-007 `showcases --showcase-type animated` is sent as `animate`
 
-- The public docs and the Skill reference say `all | animated | static`; the server
-  binding (checked read-only, meshyd `ListShowcasesForOpenAPIRequest`) accepts
-  `all | animate | static` and would reject `animated` with 400.
+- The public docs and the Skill reference say `all | animated | static`; the API
+  accepts `all | animate | static` and would reject `animated` with 400.
 - The CLI accepts both spellings, sends `animate`, and adds a warning
   `showcase_type_alias` so the translation is visible. Live verification is not_run.
 
@@ -76,8 +75,7 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
 
 ## D-009 `face_count` is unknown unless the server sends it
 
-- The public task DTO has no `face_count` field (meshyd `httpapi/dto.go`, read-only
-  check). `inspect faces --resource … --task-id …` therefore usually yields
+- The API's task responses do not include `face_count`. `inspect faces --resource … --task-id …` therefore usually yields
   `verdict: unknown`, exit 13. The legacy `check-faces` defaulted a missing value to 0
   and printed a passing line for a model it never measured; that is not reproduced.
 - `--task-json` files that carry `face_count` (e.g. saved tasks from a future server
