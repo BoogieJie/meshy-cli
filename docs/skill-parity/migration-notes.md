@@ -198,7 +198,7 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | Creative Lab `delete` | `deleted: true` | `deleted: false, canceled: true` (the task is kept as CANCELED) | D-071 |
 | standalone text-to-3d refine | sent `texture_resolution: "4k"`, `remove_lighting: true` | sends neither unless asked (server defaults: 2k, lighting removed on meshy-6/7) | D-067 |
 | local `.stl`/`.obj`/`.fbx` for remesh, convert, resize, retexture, multi-color-print, analyze/repair-printability | sent inline, refused by the API (or stored under the wrong format) | refused locally (exit 2): pass a URL or `--input-task-id`; `.glb`/`.gltf` unchanged (multi-color-print: `.glb`) | D-070 |
-| `animation-catalog list` | anonymous, local search, `rig_type`/`is_free` per item | needs a key, server-side filters, items as the API returns them | D-073 |
+| `animation-catalog list` | anonymous, local search (name / key / sub-category); result had `fetched`, `total`, `authenticated`, `search_scope: "local"`; items had `rig_type` / `is_free` / `is_default` | needs a key; server-side filters (`--search` matches name / key, `--sub-category` filters); result has `count`, `filters`, `search_scope: "server"`; items as the API returns them | D-073 |
 | `balance` | `balance` only | also `monthly_credits`, `permanent_credits`, `monthly_resets_at` | D-076 |
 
 New global flags: `--output-schema`, `--api-key-file`, `--workspace`, `--no-update-check`,
