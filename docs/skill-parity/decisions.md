@@ -737,7 +737,7 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
 
 - `engines.node` was raised from `>=20` to `>=24` in `7edf056` ("chore: upgrade
   Node and dependencies") as a side effect of a dependency bump, not because any
-  code needed Node 24. Audited on 2026-09-22: the only runtime gate in the tree
+  code needed Node 24. Checked on 2026-09-22: the only runtime gate in the tree
   was `REQUIRED_NODE_MAJOR = 24` in `doctor.ts`; `@types/node@^22` typechecks
   clean and the full suite is 563/563 on Node 22.22.0. The real floor is the
   strictest dependency, `commander@15` at `>=22.12.0`.
@@ -1075,3 +1075,30 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   call. It is now kind `action` (a one-off API call that changes state) with
   its endpoint, and `counts` gains `action`. The entry keeps its keys and its
   place at the end of `items`.
+
+## D-078 `--ai-model` picks the Smart Topology model: meshy-t2 or meshy-t2.5
+
+- Smart topology now has two models, so "the mode is the model" no longer
+  holds for it. image-to-3d and text-to-3d preview take `--ai-model
+  meshy-t2|meshy-t2.5`, with `--model-type smart-topology` only. Standard mode
+  keeps no model flag (other models stay reachable through `--data`), and
+  multi-image-to-3d gets none: the API offers no Smart Topology there.
+- Without `--ai-model` nothing changes: the request carries no `ai_model` and
+  the API picks meshy-t2.
+- `target_polycount` is checked per model before the request: meshy-t2
+  100–15,000, meshy-t2.5 100–30,000. image-to-3d had no local range check
+  before.
+- Polycount default: meshy-t2 keeps the CLI's 10,000 (D-076). meshy-t2.5 sends
+  none and gets the API's 15,000. The 10,000 pin exists because meshy-t2's own
+  default (4,000) is too low for rigging; meshy-t2.5's is not, and pinning
+  10,000 would quietly cap a model picked for denser meshes. The default
+  follows `--ai-model`; a model set only through `--data` gets the meshy-t2
+  default, which meshy-t2.5 also accepts.
+- The checks run on the merged payload, so `--data` meets the same rules. A
+  Smart Topology `ai_model` without `model_type: "smart-topology"`,
+  `topology: "quad"` with smart-topology (its output is triangle-only; chain
+  `remesh --topology quad` for quads) and an out-of-range polycount are usage
+  errors (exit 2).
+- Credits are meshy-t2's: 5 for a mesh only; image-to-3d with 2K or 4K textures
+  15, with 8K textures 20. A text-to-3d refine of a meshy-t2.5 preview works
+  like one of a meshy-t2 preview.
