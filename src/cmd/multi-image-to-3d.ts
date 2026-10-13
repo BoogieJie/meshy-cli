@@ -1,8 +1,8 @@
 /**
  * multi-image-to-3d — https://docs.meshy.ai/en/api/multi-image-to-3d
  *
- * No model flag, same as the other 3D generation commands: the API default
- * "latest" is Meshy 7.1. geometry_resolution "2k" runs the Ultra pass (+5
+ * No model flag (the Smart Topology models are not offered here): the API
+ * default "latest" is Meshy 7.1. geometry_resolution "2k" runs the Ultra pass (+5
  * credits; the same geometry setting as the web app's Ultra 2K) and needs
  * meshy-7.1 / latest; the deprecated ultra_mode boolean is its old spelling.
  * "4k" is single-image only — the API refuses it here. Only the enum is

@@ -201,9 +201,19 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | `animation-catalog list` | anonymous, local search (name / key / sub-category); result had `fetched`, `total`, `authenticated`, `search_scope: "local"`; items had `rig_type` / `is_free` / `is_default` | needs a key; server-side filters (`--search` matches name / key, `--sub-category` filters); result has `count`, `filters`, `search_scope: "server"`; items as the API returns them | D-073 |
 | `balance` | `balance` only | also `monthly_credits`, `permanent_credits`, `monthly_resets_at` | D-076 |
 
+### 3.9 Changes in 0.4.3 (visible in both schemas)
+
+| Behaviour | 0.4.2 and earlier | 0.4.3 | Decision |
+| --- | --- | --- | --- |
+| `--ai-model` on image-to-3d and text-to-3d preview | no flag (`--data` only) | `meshy-t2` \| `meshy-t2.5`, with `--model-type smart-topology` only; omitted, the API picks meshy-t2 as before | D-078 |
+| smart-topology `--target-polycount` | text-to-3d checked 100–15,000; image-to-3d sent any value | checked per model on both: meshy-t2 100–15,000, meshy-t2.5 100–30,000 (exit 2 outside) | D-078 |
+| smart-topology polycount default with `--ai-model meshy-t2.5` | — | none sent (the API's 15,000); meshy-t2 still gets 10,000 | D-078 |
+| a Smart Topology `ai_model` without smart-topology, or smart-topology with `topology: "quad"` (through `--data`) | sent, refused by the API | refused locally (exit 2) | D-078 |
+
 New global flags: `--output-schema`, `--api-key-file`, `--workspace`, `--no-update-check`,
 `--base-url-creative-lab`. New per-command flags on task verbs: `--save-json`,
 `--include-raw`, `--project`, `--stage`, `--operation-id`, `--stop-after-first` (make),
 `--idle-timeout` (stream). New commands: `uv-unwrap`, `creative-lab`, `animation-catalog`,
 `showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`; in 0.4.2
-`auto-split` and `usage`.
+`auto-split` and `usage`. In 0.4.3: `--ai-model` on image-to-3d and text-to-3d
+(smart-topology).

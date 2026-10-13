@@ -83,14 +83,16 @@ test("image-to-3d gained the smart-topology surface and task chaining", () => {
   assert.ok(createFlags("multi-image-to-3d").has("--input-task-id"));
 });
 
-test("the mode is the model: no model flag on the 3D generation commands", () => {
-  // Each mode has exactly one model (standard → meshy-7.1 via latest,
-  // smart-topology → meshy-t2), so --ai-model is gone from 3D generation —
-  // the 2D image commands keep theirs. text-to-3d's --model-type offers the
+test("the mode picks the model: --ai-model on 3D generation offers the Smart Topology models only", () => {
+  // Standard has one model (meshy-7.1 via latest), so it has no model flag;
+  // smart-topology has two (meshy-t2, meshy-t2.5). multi-image-to-3d has no
+  // Smart Topology, so no --ai-model. text-to-3d's --model-type offers the
   // two modes only (lowpoly was the t1-era engine and stays out).
-  for (const resource of ["text-to-3d", "image-to-3d", "multi-image-to-3d"]) {
-    assert.ok(!createFlags(resource).has("--ai-model"), `${resource} still has --ai-model`);
+  for (const resource of ["text-to-3d", "image-to-3d"]) {
+    const model = sub(sub(root, resource), "create").options.find((o) => o.long === "--ai-model");
+    assert.deepEqual(model?.argChoices, ["meshy-t2", "meshy-t2.5"], resource);
   }
+  assert.ok(!createFlags("multi-image-to-3d").has("--ai-model"), "multi-image-to-3d has --ai-model");
   const modeType = sub(sub(root, "text-to-3d"), "create").options.find((o) => o.long === "--model-type");
   assert.deepEqual(modeType?.argChoices, ["standard", "smart-topology"]);
   for (const resource of ["text-to-image", "image-to-image"]) {

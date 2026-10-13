@@ -109,8 +109,12 @@ meshy-cli image-to-3d create --image-url https://example.com/cat.png --geometry-
 # text → standalone motion clip (Prime/FBX by default; Swift produces BVH)
 meshy-cli text-to-motion create --prompt "a character waving" --duration 3
 
-# smart topology: component-aware low-poly with a native polycount
+# smart topology: component-aware low-poly with a native polycount (triangles only).
+# meshy-t2 (the API's choice when --ai-model is omitted): 100-15000, CLI default 10000;
+# meshy-t2.5: 100-30000, default the API's 15000. Credits for either: 5 mesh only,
+# 15 textured at 2k/4k, 20 at 8k. A meshy-t2.5 preview refines like any other.
 meshy-cli image-to-3d create --image-url cat.png --model-type smart-topology --target-polycount 10000
+meshy-cli image-to-3d create --image-url cat.png --model-type smart-topology --ai-model meshy-t2.5 --target-polycount 25000
 meshy-cli text-to-3d create --mode preview --prompt "a toy robot" --model-type smart-topology --target-polycount 8000
 
 # printability with a print size: also checks (analyze) or thickens (repair) thin walls

@@ -7,15 +7,16 @@
  * The flag surface is deliberately minimal: topology and polycount are
  * remesh's job (except smart topology's native polycount), resizing is
  * resize's job, deprecated parameters (symmetry_mode, lowpoly, ultra_mode)
- * are gone, and there is no model flag — the mode is the model: standard runs
- * the server default "latest" (Meshy 7.1), smart-topology runs meshy-t2. The
- * `--data` escape hatch still reaches anything the API accepts.
+ * are gone, and the mode picks the model: standard runs the server default
+ * "latest" (Meshy 7.1), smart-topology runs meshy-t2, or meshy-t2.5 with
+ * --ai-model. The `--data` escape hatch still reaches anything the API accepts.
  */
 
 import { Option } from "commander";
 import { parseBool, parseCsv, parseInt10 } from "../internal/flags.js";
 import { UsageError } from "../internal/errors.js";
 import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task-command.js";
+import { checkSmartTopology, defaultPolycount, SMART_TOPOLOGY_MODELS } from "../internal/smart-topology.js";
 
 const spec: ResourceCommandSpec = {
   name: "text-to-3d",
@@ -44,10 +45,20 @@ const spec: ResourceCommandSpec = {
         .addOption(
           new Option(
             "--model-type <kind>",
-            "preview only. standard (default; full-detail generation) | smart-topology (meshy-t2: clean triangle topology, separated parts, native --target-polycount)",
+            "preview only. standard (default; full-detail generation) | smart-topology (clean triangle topology, separated parts, native --target-polycount; meshy-t2, or --ai-model meshy-t2.5)",
           ).choices(["standard", "smart-topology"]),
         )
-        .option("--target-polycount <n>", "preview, smart-topology only: target face count, 100-15000 (default: 10000)", parseInt10)
+        .addOption(
+          new Option(
+            "--ai-model <model>",
+            "preview, smart-topology only: meshy-t2 (the API's choice when omitted) | meshy-t2.5 (polycount up to 30000)",
+          ).choices([...SMART_TOPOLOGY_MODELS]),
+        )
+        .option(
+          "--target-polycount <n>",
+          "preview, smart-topology only: target face count — meshy-t2 100-15000 (default: 10000), meshy-t2.5 100-30000 (default: the API's 15000)",
+          parseInt10,
+        )
         .addOption(
           new Option(
             "--geometry-resolution <res>",
@@ -82,7 +93,7 @@ const spec: ResourceCommandSpec = {
         throw new UsageError("--mode refine requires --preview-task-id");
       }
       if (mode === "refine") {
-        for (const [flag, value] of [["--model-type", opts.modelType], ["--target-polycount", opts.targetPolycount], ["--geometry-resolution", opts.geometryResolution]] as const) {
+        for (const [flag, value] of [["--model-type", opts.modelType], ["--ai-model", opts.aiModel], ["--target-polycount", opts.targetPolycount], ["--geometry-resolution", opts.geometryResolution]] as const) {
           if (value !== undefined) throw new UsageError(`${flag} applies to --mode preview only (refine inherits the preview's geometry)`);
         }
       }
@@ -90,11 +101,8 @@ const spec: ResourceCommandSpec = {
       if (opts.targetPolycount !== undefined && !smart) {
         throw new UsageError("--target-polycount applies to --model-type smart-topology only; for standard outputs chain `remesh` afterwards");
       }
-      if (opts.targetPolycount !== undefined && ((opts.targetPolycount as number) < 100 || (opts.targetPolycount as number) > 15000)) {
-        throw new UsageError("--target-polycount must be between 100 and 15000");
-      }
       if (smart && opts.geometryResolution !== undefined && opts.geometryResolution !== "standard") {
-        throw new UsageError("--geometry-resolution 2k/4k needs meshy-7.1 (standard); smart-topology runs meshy-t2");
+        throw new UsageError("--geometry-resolution 2k/4k needs meshy-7.1 (standard), not smart-topology");
       }
       return {
         mode,
@@ -103,6 +111,7 @@ const spec: ResourceCommandSpec = {
         // "auto" means "let the model decide" — the API's default, expressed by omission.
         pose_mode: opts.poseMode === "auto" ? undefined : opts.poseMode,
         model_type: opts.modelType,
+        ai_model: opts.aiModel,
         target_polycount: opts.targetPolycount,
         geometry_resolution: opts.geometryResolution,
         enable_pbr: opts.enablePbr,
@@ -121,15 +130,16 @@ const spec: ResourceCommandSpec = {
       // removed on meshy-6/7) apply otherwise. `make` still asks for 4k: it
       // made the preview itself, on latest.
       // GLB-only output — omitting target_formats makes the API produce
-      // every format. Smart topology gets image-to-3d's rigging-friendly 10k
-      // polycount, so the two commands default alike.
+      // every format. Smart topology defaults like image-to-3d: 10k on
+      // meshy-t2, the API's 15k on meshy-t2.5 (D-078).
       const refine = opts.mode === "refine";
       return {
         enable_pbr: refine ? true : undefined,
-        target_polycount: opts.modelType === "smart-topology" ? 10_000 : undefined,
+        target_polycount: defaultPolycount(opts),
         target_formats: ["glb"],
       };
     },
+    validatePayload: checkSmartTopology,
   },
   endpointOf: (c) => c.textTo3d,
 };

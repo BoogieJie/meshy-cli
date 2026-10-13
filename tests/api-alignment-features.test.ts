@@ -330,6 +330,62 @@ test("generation: --geometry-resolution on text-to-3d preview and image-to-3d; t
   });
 });
 
+test("smart topology meshy-t2.5: --ai-model on image-to-3d and text-to-3d preview, polycount up to 30000, the API's default polycount", async () => {
+  await withApi(accept, async (api) => {
+    const smart = ["--model-type", "smart-topology"];
+    const img = ["image-to-3d", "create", "--input-task-id", "img", ...smart];
+    const txt = ["text-to-3d", "create", "--mode", "preview", "--prompt", "a robot", ...smart];
+    const ok = async (args: string[]) => {
+      const r = await runCli([...args, "--async"], { env: api.env() });
+      assert.equal(r.code, 0, `${args.join(" ")}: ${r.stderr}`);
+      return api.requests[api.requests.length - 1]!;
+    };
+
+    let req = await ok([...img, "--ai-model", "meshy-t2.5", "--target-polycount", "30000"]);
+    assert.equal(req.path, "/openapi/v1/image-to-3d");
+    assert.equal((req.json as Record<string, unknown>)["ai_model"], "meshy-t2.5");
+    assert.equal((req.json as Record<string, unknown>)["model_type"], "smart-topology");
+    assert.equal((req.json as Record<string, unknown>)["target_polycount"], 30_000);
+    req = await ok([...txt, "--ai-model", "meshy-t2.5", "--target-polycount", "30000"]);
+    assert.equal(req.path, "/openapi/v2/text-to-3d");
+    assert.equal((req.json as Record<string, unknown>)["ai_model"], "meshy-t2.5");
+    assert.equal((req.json as Record<string, unknown>)["target_polycount"], 30_000);
+    // Without --target-polycount meshy-t2.5 keeps the API's default (15000); meshy-t2 still gets 10000.
+    for (const base of [img, txt]) {
+      req = await ok([...base, "--ai-model", "meshy-t2.5"]);
+      assert.ok(!("target_polycount" in (req.json as object)), `${base[0]}: meshy-t2.5 polycount is left to the API`);
+      req = await ok([...base, "--ai-model", "meshy-t2"]);
+      assert.equal((req.json as Record<string, unknown>)["ai_model"], "meshy-t2");
+      assert.equal((req.json as Record<string, unknown>)["target_polycount"], 10_000);
+    }
+    // A model_type sent through --data counts as smart-topology.
+    req = await ok(["image-to-3d", "create", "--input-task-id", "img", "--data", '{"model_type":"smart-topology"}', "--ai-model", "meshy-t2.5"]);
+    assert.equal((req.json as Record<string, unknown>)["ai_model"], "meshy-t2.5");
+    const posts = api.requests.length;
+
+    for (const args of [
+      [...img, "--target-polycount", "30000"],
+      [...img, "--ai-model", "meshy-t2", "--target-polycount", "30000"],
+      [...txt, "--target-polycount", "30000"],
+      [...img, "--ai-model", "meshy-t2.5", "--target-polycount", "30001"],
+      [...txt, "--ai-model", "meshy-t2.5", "--target-polycount", "99"],
+      ["image-to-3d", "create", "--input-task-id", "img", "--ai-model", "meshy-t2.5"],
+      ["image-to-3d", "create", "--input-task-id", "img", "--model-type", "standard", "--ai-model", "meshy-t2.5"],
+      ["image-to-3d", "create", "--input-task-id", "img", "--data", '{"ai_model":"meshy-t2.5"}'],
+      ["text-to-3d", "create", "--mode", "preview", "--prompt", "x", "--ai-model", "meshy-t2.5"],
+      ["text-to-3d", "create", "--mode", "refine", "--preview-task-id", "p", "--ai-model", "meshy-t2.5"],
+      [...img, "--ai-model", "meshy-t2.5", "--data", '{"topology":"quad"}'],
+      [...txt, "--ai-model", "meshy-t2.5", "--data", '{"topology":"quad"}'],
+      [...img, "--ai-model", "meshy-6"],
+      ["multi-image-to-3d", "create", "--input-task-id", "img", "--ai-model", "meshy-t2.5"],
+    ]) {
+      const r = await runCli([...args, "--async"], { env: api.env() });
+      assert.equal(r.code, 2, `${args.join(" ")}: ${r.stdout}`);
+    }
+    assert.equal(api.requests.length, posts, "every refusal happens before the request");
+  });
+});
+
 test("multi-image-to-3d --texture-image-urls: local files are inlined, 1-4 views, needs a textured run, not with --texture-prompt", async () => {
   const { writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");

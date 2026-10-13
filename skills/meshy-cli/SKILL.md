@@ -165,8 +165,9 @@ These are API rules, not preferences — ignoring them produces failed tasks:
   `--geometry-resolution 2k|4k` runs the Ultra geometry pass (+5 credits;
   text-to-3d: preview only; multi-image: `2k` only; not with smart-topology);
   `--ultra-mode` on image-to-3d is its deprecated spelling of `2k`.
-  `--model-type smart-topology` (meshy-t2, text-to-3d and image-to-3d) has a
-  native `--target-polycount` (default 10000). `retexture`'s
+  `--model-type smart-topology` (text-to-3d and image-to-3d) has a native
+  `--target-polycount`: meshy-t2 100-15000 (default 10000); `--ai-model
+  meshy-t2.5` up to 30000 (default 15000). `retexture`'s
   `--multiview-image-urls` needs Meshy 7 — it takes 1-4 views of **the same
   object**, not style references.
 - Printing: `analyze-`/`repair-printability` take `--printer-type

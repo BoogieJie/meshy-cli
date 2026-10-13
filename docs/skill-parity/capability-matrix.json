@@ -432,7 +432,8 @@
       ],
       "evidence": [
         "payload merge defaults < --data < flags with explicit false/0 preserved; tests T-028; surface.test.ts unchanged",
-        "tests/codex-review-round1.test.ts R04/F08"
+        "tests/codex-review-round1.test.ts R04/F08",
+        "0.4.3: smart-topology --ai-model meshy-t2|meshy-t2.5 on image-to-3d and text-to-3d preview, per-model target_polycount range on the merged payload, meshy-t2.5 polycount default left to the API (decisions D-078); tests/api-alignment-features.test.ts, tests/surface.test.ts"
       ],
       "intentional_differences": [],
       "external_verification": "live_passed",
