@@ -188,9 +188,9 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | `creative-lab … get`/`wait` while the task is IN_PROGRESS (the endpoint returns `finished_at: null`) | `server` error "unexpected task shape", HTTP 200, exit 1 on every poll until completion | parses; null timestamps/counts read as 0 (v1 view shows `null` as before); `wait` polls through | D-059 |
 | task verbs `-o` on a Creative Lab lamp build / keychain OBJ build | `model.lamp_stl`, `model.base_stl`; the OBJ ZIP bundle saved as `model.obj` | `lamp.stl`, `base.stl`, `model.obj.zip` — the same names `meshy download` uses; slot keys unchanged | D-060 |
 
-### 3.8 Changes in 0.5.0 (visible in both schemas)
+### 3.8 Changes in 0.4.2 (visible in both schemas)
 
-| Behaviour | 0.4.x | 0.5.0 | Decision |
+| Behaviour | 0.4.1 and earlier | 0.4.2 | Decision |
 | --- | --- | --- | --- |
 | a 429 / 5xx / read timeout on a status request while waiting | ends the wait (`server`/`network`, exit 1/7) | retried at the next poll; an outage that outlasts `--timeout` is exit 8 with the task id | D-068 |
 | `delete` of an IN_PROGRESS task (409) | `server`, exit 1 | `conflict`, exit 14, `recovery.command` = `wait` | D-069 |
@@ -204,5 +204,5 @@ New global flags: `--output-schema`, `--api-key-file`, `--workspace`, `--no-upda
 `--base-url-creative-lab`. New per-command flags on task verbs: `--save-json`,
 `--include-raw`, `--project`, `--stage`, `--operation-id`, `--stop-after-first` (make),
 `--idle-timeout` (stream). New commands: `uv-unwrap`, `creative-lab`, `animation-catalog`,
-`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`; in 0.5.0
+`showcases`, `download`, `project`, `inspect`, `mesh`, `slicer`, `doctor`; in 0.4.2
 `auto-split` and `usage`.
