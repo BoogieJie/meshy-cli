@@ -1,10 +1,10 @@
 ---
 name: meshy-cli
-description: "Generate 3D models, motion clips, 2D images and Creative Lab print products with the Meshy API through the meshy-cli command — text-to-3D, image-to-3D, text-to-motion, remesh, UV unwrap, rigging, animation, retexture, printability, selective downloads, project folders, face checks, OBJ print preparation and slicer launch. Use for any Meshy asset or 3D-printing request."
+description: "Generate 3D models, motion clips, 2D images and Creative Lab print products with the Meshy API through the meshy-cli command — text-to-3D, image-to-3D, text-to-motion, remesh, UV unwrap, rigging, animation, retexture, printability, auto split into printable parts, per-task credit usage, selective downloads, project folders, face checks, OBJ print preparation and slicer launch. Use for any Meshy asset or 3D-printing request."
 license: MIT
 compatibility: Requires meshy-cli on PATH (Node 22.12+, no Python) and a stored credential, MESHY_API_KEY or --api-key-file for API commands; network access to api.meshy.ai. Local helpers work offline.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   cli-help: "meshy --help"
 ---
 
@@ -22,14 +22,10 @@ network; `meshy doctor --check-api` makes one free balance call.
 
 ## Always ask for the stable envelope
 
-Add `--output-schema v1 --format json` to every command you parse. `--format` is
-not optional politeness: untyped, it renders `pretty` for a human at a terminal
-and `json` everywhere else. You will almost always be on the `json` side — a
-subprocess pipe is not a TTY — and a typed `--output-schema v1` alone already
-means JSON even in a pseudo-terminal, but say both and the shape is yours
-regardless of how you are spawned. `pretty` is a human view that drops fields,
-so never parse it. `json` and `ndjson` never carry terminal colour codes, so
-you never need to strip escapes. stdout is then
+Add `--output-schema v1 --format json` to every command you parse. Untyped,
+`--format` is `pretty` at a terminal and `json` elsewhere; say both and the
+shape is fixed however you are spawned. `pretty` is a human view that drops
+fields, so never parse it; `json` and `ndjson` carry no colour codes. stdout is then
 exactly one JSON object with six keys — `schema_version, command, ok, result,
 error, warnings` — and nothing else. Progress goes to stderr as plain lines
 (none under `ndjson`); it is for people, so read ids from stdout, not from it. `ok` is whether the
@@ -37,7 +33,8 @@ CLI operation completed; `result.task.status` is the server's task state (a `get
 of a FAILED task is `ok:true`). Fields the server did not send are `null` —
 never treat a `null` `face_count` or `consumed_credits` as 0. `error.code` and
 the exit code (below) are stable; `error.recovery.command`, when present, is a
-command you can run verbatim.
+command you can run verbatim, once a `<dir>`/`<file>` placeholder in it (download
+recoveries) is replaced with a real path.
 
 ## One model, one command
 
@@ -55,8 +52,8 @@ verbatim rather than starting over, or the finished step is paid for twice.
 
 ## Everything else
 
-`meshy resources --output-schema v1` indexes every command (kind `task`, `query`
-or `local`); each task resource carries the same verbs:
+`meshy resources --output-schema v1` indexes every command (kind `task`, `query`,
+`action` or `local`); each task resource carries the same verbs:
 
 ```bash
 meshy <resource> create [flags] [--data '<json>'] [--async] [--timeout <s>] [--operation-id <id>] --output-schema v1
@@ -110,8 +107,7 @@ lampshade GLB, keycap yields `candidate_ids` (pass one as the build's
 made through this API with the same key (web-app prototypes → 404). Lamp builds
 output `lamp_stl`/`base_stl` or `bundle_zip`; keychain/fridge-magnet `obj` and
 keycap `obj_zip` are ZIP bundles saved as `.zip`; fidget-pixel builds a 3MF.
-Creative Lab `delete` cancels (`canceled: true`). Never call `showcases` in a
-health check.
+Never call `showcases` in a health check.
 
 ## Downloads, projects, printing (local, no key)
 
@@ -160,21 +156,24 @@ These are API rules, not preferences — ignoring them produces failed tasks:
 - **`meshy delete <id>` never reaches Creative Lab tasks**; `meshy creative-lab
   <product> <stage> delete <id>` cancels one instead (`canceled: true`).
 - **`uv-unwrap` takes one source** (`--input-task-id` or `--model-url`, GLB only).
-- **`multi-image-to-3d` is beta**; use `image-to-3d` unless multi-view input was
-  explicitly asked for. Its default runs a two-stage multi-view model;
-  `--geometry-resolution 2k` turns on the multi-view Ultra pass (+5 credits),
-  the same geometry setting as the web app's Ultra 2K. The Ultra model follows
-  `ai_model`: add `--data '{"ai_model":"meshy-7.1"}'` to pin Meshy 7.1.
+- `multi-image-to-3d` takes 1-4 views of one object; use `image-to-3d` unless
+  multi-view input was asked for. Both accept `--input-task-id` of a SUCCEEDED
+  `text-to-image` / `image-to-image` task, so a generated image chains to 3D.
 - `image-to-3d` defaults to an untextured draft mesh; `--should-texture true`
   (what `make` uses) produces a textured model in one task.
-- **The default model is `latest` = Meshy 7.1** on text-to-3d and image-to-3d.
-  `--geometry-resolution 2k|4k` runs the Ultra geometry pass there (text-to-3d:
-  preview only; not with smart-topology; billed on top); `--ultra-mode` on
-  image-to-3d is its deprecated spelling of `2k`. `multi-image-to-3d` takes
-  `standard|2k` only. `--model-type smart-topology` (meshy-t2, both endpoints)
-  has a native `--target-polycount` and refuses `--remove-lighting` /
-  `--image-enhancement`. `retexture`'s `--multiview-image-urls` needs Meshy 7 —
-  it takes 1-4 views of **the same object**, not style references.
+- **The default model is `latest` = Meshy 7.1** on all three generators.
+  `--geometry-resolution 2k|4k` runs the Ultra geometry pass (+5 credits;
+  text-to-3d: preview only; multi-image: `2k` only; not with smart-topology);
+  `--ultra-mode` on image-to-3d is its deprecated spelling of `2k`.
+  `--model-type smart-topology` (meshy-t2, text-to-3d and image-to-3d) has a
+  native `--target-polycount` (default 10000). `retexture`'s
+  `--multiview-image-urls` needs Meshy 7 — it takes 1-4 views of **the same
+  object**, not style references.
+- Printing: `analyze-`/`repair-printability` take `--printer-type
+  fdm|sla|full_color` and one `--intended-print-height-mm` /
+  `--intended-print-longest-side-mm`; `multi-color-print` takes `--style
+  realistic|cartoon` and `--printer-brand`. `text-to-image` / `image-to-image`
+  take `--remove-background true` (transparent PNG).
 - **A standalone refine defaults to 2k textures**: 4k/8k and `--remove-lighting`
   are refused for a meshy-6-lite preview, so pass `--texture-resolution 4k` only
   for a meshy-6 / meshy-7.1 / latest preview (`make` does).
@@ -204,8 +203,9 @@ Exit codes: `0` ok · `1` task FAILED/CANCELED while waiting, or unclassified ·
 - Exit 8 → `wait`/`stream` the same task id again; it was not cancelled. A
   429/5xx/timeout on a status request is already retried while waiting; the
   default `--timeout` is 600 s, the API advises waiting up to 60 min.
-- Exit 14 → the task is still running; run `error.recovery.command` (`wait`),
-  then delete again.
+- Exit 14 → the task is running: it cannot be stopped and its credits are spent.
+  `wait` for the result; delete it afterwards only if the user wants the result
+  gone (permanent, no refund).
 - Exit 130 after `-o` → the transfer (or the material rewrite) was cancelled;
   `result.downloads.files` lists what already landed (`status: written`), the rest can
   be fetched with `meshy download`. `downloads.failed_step` (`relink` | `digest` |
@@ -221,10 +221,9 @@ Exit codes: `0` ok · `1` task FAILED/CANCELED while waiting, or unclassified ·
   `error.recovery.command` (`meshy project record …`, it already carries the original
   `--workspace` and `--operation-id`) verbatim — do not download or create again. The same
   command appears after a task verb's `--project` record failure (legacy: `hint`); when the
-  error says the project is *no longer a target inside the authorised boundary* (the project,
-  its parent or the workspace itself changed while the request was in flight) there is
-  deliberately no command and `recovery` is null — restore the directory first, then record
-  with `meshy project record` from inside the original workspace.
+  error says the project is *no longer a target inside the authorised boundary* (it moved
+  mid-request) there is deliberately no command and `recovery` is null — restore the
+  directory first, then record with `meshy project record` from inside the original workspace.
 - Exit 10 → reconcile with `<resource> list`; never submit the same create again blindly.
 - A `FAILED` task → relay `result.task.task_error.message` verbatim; do not guess a cause.
 - Any error may carry `error.recovery.command` — prefer it over improvising.
