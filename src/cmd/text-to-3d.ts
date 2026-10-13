@@ -21,7 +21,8 @@ const spec: ResourceCommandSpec = {
   name: "text-to-3d",
   description:
     "Generate 3D models from text prompts (two-stage: preview → refine). " +
-    "Topology/polycount are not tunable here — chain `remesh` afterwards",
+    "Topology/polycount are not tunable in standard mode — chain `remesh` afterwards; " +
+    "smart-topology mode has a native polycount",
   create: {
     description: "Create a text-to-3d task",
     configure(cmd) {
@@ -46,7 +47,7 @@ const spec: ResourceCommandSpec = {
             "preview only. standard (default; full-detail generation) | smart-topology (meshy-t2: clean triangle topology, separated parts, native --target-polycount)",
           ).choices(["standard", "smart-topology"]),
         )
-        .option("--target-polycount <n>", "preview, smart-topology only: target face count, 100-15000 (server default: 4000)", parseInt10)
+        .option("--target-polycount <n>", "preview, smart-topology only: target face count, 100-15000 (default: 10000)", parseInt10)
         .addOption(
           new Option(
             "--geometry-resolution <res>",
@@ -120,10 +121,12 @@ const spec: ResourceCommandSpec = {
       // removed on meshy-6/7) apply otherwise. `make` still asks for 4k: it
       // made the preview itself, on latest.
       // GLB-only output — omitting target_formats makes the API produce
-      // every format.
+      // every format. Smart topology gets image-to-3d's rigging-friendly 10k
+      // polycount, so the two commands default alike.
       const refine = opts.mode === "refine";
       return {
         enable_pbr: refine ? true : undefined,
+        target_polycount: opts.modelType === "smart-topology" ? 10_000 : undefined,
         target_formats: ["glb"],
       };
     },

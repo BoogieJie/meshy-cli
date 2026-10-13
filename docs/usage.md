@@ -117,10 +117,9 @@ meshy-cli text-to-3d create --mode preview --prompt "a toy robot" --model-type s
 meshy-cli analyze-printability create --input-task-id <id> --printer-type fdm --intended-print-height-mm 120
 meshy-cli multi-color-print create --input-task-id <id> --style cartoon --printer-brand prusa
 
-# multi-view → 3D: the default is a two-stage multi-view model; 2k turns on the
-# multi-view Ultra pass (+5 credits), the web app's Ultra 2K geometry setting;
-# the Ultra model follows ai_model, so pin Meshy 7.1 through --data
-meshy-cli multi-image-to-3d create --image-urls front.png,side.png,back.png --geometry-resolution 2k --data '{"ai_model":"meshy-7.1"}'
+# multi-view → 3D (Meshy 7.1 by default); 2k turns on the Ultra pass (+5 credits),
+# the web app's Ultra 2K geometry setting
+meshy-cli multi-image-to-3d create --image-urls front.png,side.png,back.png --geometry-resolution 2k
 
 # fire-and-forget (--async): exactly one POST, returns the task_id, query later
 TASK=$(meshy-cli text-to-image create --prompt "mountain landscape" --async --output-schema v1 | jq -r .result.submission.task_id)
@@ -246,9 +245,12 @@ meshy-cli delete <task-id>
     # GET is per resource, so `get`/`wait`/`stream` live only on their resource.
 ```
 
-A PENDING task is deleted and refunded. An IN_PROGRESS one is refused by the
-server (409): the CLI reports `conflict`, exit `14`, with the `wait` command
-to run before deleting again. Creative Lab tasks are reached only through
+Delete is permanent. A PENDING task is deleted and refunded. An IN_PROGRESS
+one cannot be stopped and its credits are spent: the API refuses it (409) and
+the CLI reports `conflict`, exit `14`, with the resource's `wait` command (none
+from the top-level `delete`, which does not know the resource) to get the
+result. A finished task is deleted without a refund, so delete it only if the
+result should be gone. Creative Lab tasks are reached only through
 `meshy creative-lab <product> <stage> delete`, and that one **cancels**: the
 task stays, as `CANCELED` (PENDING refunded, IN_PROGRESS not, a finished task
 refused), and the result says `canceled: true`, `deleted: false`.

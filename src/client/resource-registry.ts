@@ -178,7 +178,7 @@ export const TASK_RESOURCES: readonly TaskResourceDescriptor[] = [
     summary: "two-stage 3D generation from text (preview → refine)",
   },
   v1("image-to-3d", "/image-to-3d", { mediaFields: [image("image_url")], taskTypes: ["image-to-3d"], summary: "3D from a single image (standard or smart-topology low-poly)" }),
-  v1("multi-image-to-3d", "/multi-image-to-3d", { mediaFields: [image("image_urls", true), image("texture_image_urls", true)], taskTypes: ["multi-image-to-3d"], summary: "3D from multiple views (beta; prefer image-to-3d)" }),
+  v1("multi-image-to-3d", "/multi-image-to-3d", { mediaFields: [image("image_urls", true), image("texture_image_urls", true)], taskTypes: ["multi-image-to-3d"], summary: "3D from 1-4 views of one object (prefer image-to-3d for a single image)" }),
   v1("remesh", "/remesh", { mediaFields: [inlineModel("model_url")], taskTypes: ["remesh"], summary: "retopologize / change polycount" }),
   v1("convert", "/convert", { mediaFields: [inlineModel("model_url")], taskTypes: ["convert"], summary: "change file format only" }),
   v1("resize", "/resize", { mediaFields: [inlineModel("model_url")], taskTypes: ["resize"], summary: "resize to real-world dimensions" }),
@@ -269,10 +269,9 @@ export const LOCAL_TOOLS: readonly LocalToolDescriptor[] = [
   { id: "mesh.prepare-print", commandPath: ["mesh", "prepare-print"], summary: "OBJ Y-up → Z-up, scale to a target height, centre, bottom at Z=0" },
   { id: "slicer", commandPath: ["slicer"], summary: "detect installed slicers | open a file in one" },
   { id: "doctor", commandPath: ["doctor"], summary: "local environment diagnosis (no network by default)" },
-  { id: "delete", commandPath: ["delete"], summary: "delete a task of any resource except Creative Lab (whose own delete verb cancels)" },
 ];
 
-export type ResourceIndexKind = "task" | "query" | "local";
+export type ResourceIndexKind = "task" | "query" | "action" | "local";
 
 export interface ResourceIndexEntry {
   name: string;
@@ -283,7 +282,7 @@ export interface ResourceIndexEntry {
   verbs: Verb[] | null;
 }
 
-/** The v1 `resources` index: every task resource, query and local tool. */
+/** The v1 `resources` index: every task resource, query, action and local tool. */
 export function resourceIndex(): ResourceIndexEntry[] {
   const verbsOf = (s: VerbSupport): Verb[] =>
     (["create", "get", "list", "wait", "stream", "delete"] as const)
@@ -313,5 +312,9 @@ export function resourceIndex(): ResourceIndexEntry[] {
     endpoint: null,
     verbs: null,
   }));
-  return [...tasks, ...queries, ...locals];
+  // A one-off API call that changes state: not a task resource, not a read, not local.
+  const actions: ResourceIndexEntry[] = [
+    { name: "delete", kind: "action", command: "meshy delete", summary: "permanently delete a task of any resource except Creative Lab (whose own delete verb cancels)", endpoint: "/openapi/v2/text-to-3d", verbs: null },
+  ];
+  return [...tasks, ...queries, ...locals, ...actions];
 }

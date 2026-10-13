@@ -16,7 +16,7 @@ const CREATIVE_LAB_HINT =
 
 export const deleteCommand = new Command("delete")
   .description(
-    "Delete a task of any type except Creative Lab (use `meshy creative-lab <product> <stage> delete`); an IN_PROGRESS task is refused with exit 14",
+    "Permanently delete a task of any type except Creative Lab (use `meshy creative-lab <product> <stage> delete`); an IN_PROGRESS task cannot be stopped and is refused with exit 14",
   )
   .argument("<task-id>", "Meshy task id")
   .action(async (taskId: string, _opts: Record<string, unknown>, thisCmd: Command) => {
@@ -30,8 +30,8 @@ export const deleteCommand = new Command("delete")
         // Same class and shape, one more sentence: a 404 here may be a Creative Lab task.
         throw new MeshyApiError({ message: `${err.message}. ${CREATIVE_LAB_HINT}`, status: err.status, code: err.code, path: err.path, body: err.body, credentialKind: err.credentialKind });
       }
-      // The type is unknown here, so the wait command cannot name a resource.
-      throw deleteFailure(err, taskId, `meshy <resource> wait ${taskId} --output-schema v1`);
+      // The type is unknown here, so there is no runnable wait command to offer.
+      throw deleteFailure(err, taskId);
     }
     await emitResult(
       opened,

@@ -255,13 +255,20 @@ test("delete of an IN_PROGRESS task (409) is its own class: conflict, exit 14, w
   await withApi((req, res) => jsonReply(res, 409, { message: "Task is IN_PROGRESS and cannot be deleted." }), async (api) => {
     const r = await runCli(["image-to-3d", "delete", "t-run", "--output-schema", "v1"], { env: api.env() });
     assert.equal(r.code, 14, r.stdout);
-    const out = parseSingleJson(r.stdout) as { error: { code: string; http_status: number; recovery: { command: string } } };
+    const out = parseSingleJson(r.stdout) as { error: { code: string; http_status: number; hint: string; recovery: { command: string } } };
     assert.equal(out.error.code, "conflict");
     assert.equal(out.error.http_status, 409);
     assert.equal(out.error.recovery.command, "meshy image-to-3d wait t-run --output-schema v1");
+    assert.doesNotMatch(out.error.hint, /delete again|then delete/i, "deleting the finished task would destroy the paid result");
     const top = await runCli(["delete", "t-run"], { env: api.env() });
     assert.equal(top.code, 14, top.stdout);
     assert.equal((parseSingleJson(top.stdout) as { code: string }).code, "conflict");
+    // Top-level delete does not know the resource: a recovery command must be runnable verbatim, so there is none.
+    const topV1 = await runCli(["delete", "t-run", "--output-schema", "v1"], { env: api.env() });
+    assert.equal(topV1.code, 14, topV1.stdout);
+    const topOut = parseSingleJson(topV1.stdout) as { error: { code: string; recovery: Record<string, unknown> } };
+    assert.equal(topOut.error.code, "conflict");
+    assert.deepEqual(topOut.error.recovery, { action: "wait", automatic: false });
   });
   assert.equal(exitCodeFor(new MeshyApiError({ message: "x", status: 409, code: "conflict" })), 14);
 });

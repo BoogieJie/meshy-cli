@@ -323,6 +323,10 @@ test("generation: --geometry-resolution on text-to-3d preview and image-to-3d; t
     const geo = await runCli(["image-to-3d", "create", "--input-task-id", "img", "--geometry-resolution", "2k", "--async"], { env: api.env() });
     assert.equal(geo.code, 0, geo.stderr);
     assert.equal(body(api, 3)["geometry_resolution"], "2k");
+    // Smart topology defaults alike on both commands: 10000 unless asked.
+    const stDefault = await runCli(["text-to-3d", "create", "--mode", "preview", "--prompt", "a robot", "--model-type", "smart-topology", "--async"], { env: api.env() });
+    assert.equal(stDefault.code, 0, stDefault.stderr);
+    assert.equal(body(api, 4)["target_polycount"], 10_000);
   });
 });
 

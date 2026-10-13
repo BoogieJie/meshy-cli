@@ -1,16 +1,12 @@
 /**
  * multi-image-to-3d — https://docs.meshy.ai/en/api/multi-image-to-3d
  *
- * No model flag, same as the other 3D generation commands. On this endpoint
- * ai_model alone does not pick the model: unless Ultra is on, the server runs a
- * two-stage multi-view model, even for "latest" or an explicit "meshy-7.1".
- * Ultra is on with geometry_resolution "2k" (+5 credits; the same geometry
- * setting as the web app's Ultra 2K), or with the legacy ultra_mode boolean
- * when the enum is absent; "standard" overrides that boolean. With Ultra on,
- * ai_model picks the Ultra model: "meshy-7.1" pins Meshy 7.1, "latest" follows
- * the server's current choice. "4k" is single-image only — the server refuses
- * it here. Only the enum is exposed, since it supersedes the boolean; ai_model
- * and ultra_mode stay reachable through --data.
+ * No model flag, same as the other 3D generation commands: the API default
+ * "latest" is Meshy 7.1. geometry_resolution "2k" runs the Ultra pass (+5
+ * credits; the same geometry setting as the web app's Ultra 2K) and needs
+ * meshy-7.1 / latest; the deprecated ultra_mode boolean is its old spelling.
+ * "4k" is single-image only — the API refuses it here. Only the enum is
+ * exposed; ai_model and ultra_mode stay reachable through --data.
  */
 
 import { Option } from "commander";
@@ -21,10 +17,10 @@ import { buildResourceCommand, type ResourceCommandSpec } from "../internal/task
 const spec: ResourceCommandSpec = {
   name: "multi-image-to-3d",
   description:
-    "Generate a 3D model from 1-4 viewpoint images of a single object. Beta and unstable — " +
-    "prefer image-to-3d unless multi-view input is explicitly required. Each input must be a " +
+    "Generate a 3D model from 1-4 viewpoint images of a single object (Meshy 7.1 by default; " +
+    "prefer image-to-3d unless multi-view input is explicitly required). Each input must be a " +
     "separate single-view image, never one grid/collage. --geometry-resolution 2k turns on " +
-    "the multi-view Ultra pass (the web app's Ultra 2K geometry setting). Topology/polycount " +
+    "the Ultra pass (the web app's Ultra 2K geometry setting). Topology/polycount " +
     "are not tunable here — chain `remesh` afterwards",
   create: {
     description: "Create a multi-image-to-3d task",
@@ -42,7 +38,7 @@ const spec: ResourceCommandSpec = {
         .addOption(
           new Option(
             "--geometry-resolution <res>",
-            "geometry pass: standard (default; two-stage multi-view model) | 2k (multi-view Ultra pass, the web app's Ultra 2K setting; billed on top of the mesh)",
+            "geometry pass: standard (default) | 2k (the Ultra pass at 2048³, the web app's Ultra 2K setting; billed on top of the mesh)",
           ).choices(["standard", "2k"]),
         )
         .option(

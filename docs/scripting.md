@@ -123,7 +123,7 @@ one JSON document (`ndjson` streams emit one line per event plus a final
 | 11 | local I/O — refused overwrite, path outside the authorised root, journal/project write failure |
 | 12 | check failed (`inspect faces` over the limit) |
 | 13 | check unknown (`inspect faces` without a usable face count) |
-| 14 | conflict (`409`: `delete` of an IN_PROGRESS task — wait for a terminal status first) |
+| 14 | conflict (`409`: `delete` of an IN_PROGRESS task — it cannot be stopped and its credits are spent; deleting it after it finishes is permanent, with no refund) |
 | 130 | interrupted (Ctrl-C); nothing was deleted server-side |
 
 ## Agent skill

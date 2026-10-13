@@ -640,7 +640,7 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
     .description(
       cancels
         ? "Cancel a task: PENDING is refunded, IN_PROGRESS is not; a finished task cannot be canceled (the task is kept as CANCELED, not deleted)"
-        : "Delete a task (a PENDING task is refunded; an IN_PROGRESS one is refused with exit 14 — wait for it first)",
+        : "Permanently delete a task (a PENDING task is refunded; an IN_PROGRESS one cannot be stopped and is refused with exit 14; a finished one is deleted without a refund)",
     )
     .action(async (taskId: string, _opts: Record<string, unknown>, thisCmd: Command) => {
       const opened = openCommand(thisCmd, `${prefix}.delete`, defaultSchema);
@@ -707,16 +707,20 @@ export function buildResourceCommand(spec: ResourceCommandSpec): Command {
 
 /**
  * A DELETE the server refused because the task is IN_PROGRESS (409): its own
- * class (`conflict`, exit 14) with the command that waits for a terminal status.
+ * class (`conflict`, exit 14). The task cannot be stopped and its credits are
+ * spent, so the way forward is to wait for the result — not to delete it once
+ * it finishes, which is permanent and refunds nothing. Without a resource
+ * (top-level `delete`) there is no runnable wait command, so none is offered.
  */
-export function deleteFailure(err: unknown, taskId: string, waitCommand: string): unknown {
+export function deleteFailure(err: unknown, taskId: string, waitCommand?: string): unknown {
   if (!(err instanceof MeshyApiError) || err.code !== "conflict") return err;
+  const wait = waitCommand ? `\`${waitCommand}\` gets the result` : "the `wait` verb of the command that created it gets the result";
   return new CliError({
     code: "conflict",
     message: `${err.message} (task ${taskId} was not deleted)`,
     httpStatus: err.status,
-    recovery: { action: "wait", automatic: false, command: waitCommand },
-    hint: `Wait for a terminal status, then delete again: ${waitCommand}`,
+    recovery: waitCommand ? { action: "wait", automatic: false, command: waitCommand } : { action: "wait", automatic: false },
+    hint: `The task is running: it cannot be stopped and its credits are spent; ${wait}. Delete it after it finishes only if the result should be gone — that is permanent, with no refund.`,
     details: { path: err.path, body: err.body },
     result: { task_id: taskId, deleted: false },
     cause: err,

@@ -963,8 +963,13 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   exit 1, which reads as "the server broke".
 - `conflict` is a new error code with its own exit code, 14 — appended, so no
   existing code moves. The task `delete` verbs attach `recovery.command` (the
-  resource's `wait`); the top-level `delete` does not know the resource and
-  says `meshy <resource> wait <id>`.
+  resource's `wait`). The top-level `delete` does not know the resource, so its
+  `recovery` is `{action: "wait"}` with no command: a `recovery.command` is
+  always runnable verbatim, and a `<resource>` placeholder is not.
+- The hint does not say "delete again". A running task cannot be stopped and
+  its credits are spent; deleting it once it finishes is permanent and refunds
+  nothing, so waiting is for the result, and a later delete is only for a user
+  who wants the result gone.
 
 ## D-070 Inline models are glTF only
 
@@ -1057,8 +1062,18 @@ behind it, and what a reviewer should check. IDs are stable; append, do not renu
   `--ultra-mode` together with `--geometry-resolution`, two print sizes at once,
   `--texture-image-urls` with `--texture-prompt` or without `--should-texture
   true`.
-- text-to-3d smart topology sends `model_type` only; the API picks meshy-t2
-  and its own default polycount (4,000). image-to-3d keeps its 10,000 default.
+- Smart topology sends `model_type` without `ai_model` (the API picks
+  meshy-t2) and `target_polycount` 10,000 unless asked otherwise, on text-to-3d
+  as on image-to-3d: the rigging-friendly count image-to-3d already used,
+  instead of the API's 4,000, so the two commands default alike.
 - `balance` reports `monthly_credits`, `permanent_credits` and
   `monthly_resets_at` (null when the API omits them); the legacy payload gains
   them only when the API sends them.
+
+## D-077 `delete` is an `action` in the resources index
+
+- The v1 `resources` index listed the top-level `delete` as kind `local` with
+  `endpoint: null`, which reads as an offline helper. It is a destructive API
+  call. It is now kind `action` (a one-off API call that changes state) with
+  its endpoint, and `counts` gains `action`. The entry keeps its keys and its
+  place at the end of `items`.

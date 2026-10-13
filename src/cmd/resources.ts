@@ -7,7 +7,7 @@
  * callers need and points here for the rest.
  *
  * legacy: the 0.2.0 array of `{name, summary}` (new commands appended).
- * v1:     `result.items` with `kind` (task | query | local), the command line,
+ * v1:     `result.items` with `kind` (task | query | action | local), the command line,
  *         the endpoint and the supported verbs — all generated from the
  *         registry and filtered to what this build actually registers.
  */
@@ -26,7 +26,7 @@ interface ResourceEntry {
 export const RESOURCES: ResourceEntry[] = [
   { name: "text-to-3d", summary: "two-stage 3D generation from text (preview → refine)" },
   { name: "image-to-3d", summary: "3D from a single image (standard or smart-topology low-poly)" },
-  { name: "multi-image-to-3d", summary: "3D from multiple views (beta; prefer image-to-3d)" },
+  { name: "multi-image-to-3d", summary: "3D from 1-4 views of one object (prefer image-to-3d for a single image)" },
   { name: "remesh", summary: "retopologize / change polycount" },
   { name: "convert", summary: "change file format only" },
   { name: "resize", summary: "resize to real-world dimensions" },
@@ -43,7 +43,7 @@ export const RESOURCES: ResourceEntry[] = [
   { name: "delete", summary: "delete a task of any resource except Creative Lab (whose own delete verb cancels)" },
   // Added in S1 (appended so 0.2.0 consumers keep their positions).
   { name: "uv-unwrap", summary: "generate fresh UVs for a GLB (≤40k faces) — a UV white model for external texturing" },
-  { name: "creative-lab", summary: "photo → printable product: figure | lamp | keychain | fridge-magnet (prototype then build)" },
+  { name: "creative-lab", summary: "photo → printable product: figure | vinyl-figure | brick-figure | lamp | keychain | fridge-magnet | keycap | fidget-pixel (prototype then build) | fidget-collapsible (one stage)" },
   { name: "animation-catalog", summary: "animation library (action ids for animate); free, server-side search" },
   { name: "showcases", summary: "Enterprise community showcases (every request is billed)" },
   { name: "download", summary: "download selected assets of a task (saved task JSON, URL, or API)" },
@@ -93,7 +93,7 @@ export const resourcesCommand = new Command("resources")
     const byKind = (kind: ResourceIndexEntry["kind"]) => items.filter((e) => e.kind === kind).length;
     await emitResult(opened, legacy, {
       items,
-      counts: { task: byKind("task"), query: byKind("query"), local: byKind("local") },
+      counts: { task: byKind("task"), query: byKind("query"), action: byKind("action"), local: byKind("local") },
       verbs_help: "meshy resources --help",
     });
   });

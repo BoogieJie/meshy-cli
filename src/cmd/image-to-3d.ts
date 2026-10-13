@@ -87,7 +87,7 @@ const spec: ResourceCommandSpec = {
         )
         .option(
           "--remove-lighting <bool>",
-          "strip baked lighting from the base color (default: true)",
+          "strip baked lighting from the base color; the API applies it on meshy-6 only (--data '{\"ai_model\":\"meshy-6\"}') — the default Meshy 7.1 does not use it and smart-topology refuses it",
           parseBool,
         )
         .option("--target-formats <csv>", "glb,obj,fbx,stl,usdz,3mf (default: glb)", parseCsv);

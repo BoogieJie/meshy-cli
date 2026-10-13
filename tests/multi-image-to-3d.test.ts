@@ -2,11 +2,10 @@
  * multi-image-to-3d's geometry pass, asserted on the wire: a loopback API
  * records the create POST, so the test checks what the server receives.
  *
- * Unless Ultra is on (geometry_resolution "2k", or the legacy ultra_mode
- * boolean when the enum is absent), the endpoint runs a two-stage multi-view
- * model even for "latest" or "meshy-7.1"; with Ultra on, ai_model picks the
- * Ultra model. "4k" is refused server-side for this endpoint (single-image
- * only). The CLI exposes the enum; ai_model and ultra_mode ride --data.
+ * geometry_resolution "2k" (or the deprecated ultra_mode boolean) runs the
+ * Ultra pass on the default Meshy 7.1. "4k" is refused by the API for this
+ * endpoint (single-image only). The CLI exposes the enum; ai_model and
+ * ultra_mode ride --data.
  */
 
 import test from "node:test";

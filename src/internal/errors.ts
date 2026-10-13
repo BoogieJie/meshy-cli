@@ -212,7 +212,7 @@ function hintForApiError(err: MeshyApiError): { hint?: string; docs?: string } {
     case "rate_limit":
       return { hint: "Rate limited. Pause before retrying, or lower request concurrency." };
     case "conflict":
-      return { hint: "The task is still running. Wait for a terminal status (`meshy <resource> wait <task-id>`), then try again." };
+      return { hint: "The task is still running: it cannot be stopped and its credits are spent. Wait for the result; delete it afterwards only if it should be gone (permanent, no refund)." };
     default:
       return {};
   }

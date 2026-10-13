@@ -193,7 +193,8 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | Behaviour | 0.4.1 and earlier | 0.4.2 | Decision |
 | --- | --- | --- | --- |
 | a 429 / 5xx / read timeout on a status request while waiting | ends the wait (`server`/`network`, exit 1/7) | retried at the next poll; an outage that outlasts `--timeout` is exit 8 with the task id | D-068 |
-| `delete` of an IN_PROGRESS task (409) | `server`, exit 1 | `conflict`, exit 14, `recovery.command` = `wait` | D-069 |
+| `delete` of an IN_PROGRESS task (409) | `server`, exit 1 | `conflict`, exit 14, `recovery.command` = the resource's `wait` (top-level `delete`: `recovery` without a command) | D-069 |
+| v1 `resources`: the `delete` entry | kind `local`, `endpoint: null` | kind `action`, `endpoint: "/openapi/v2/text-to-3d"`; `counts.action` added | D-077 |
 | Creative Lab `delete` | `deleted: true` | `deleted: false, canceled: true` (the task is kept as CANCELED) | D-071 |
 | standalone text-to-3d refine | sent `texture_resolution: "4k"`, `remove_lighting: true` | sends neither unless asked (server defaults: 2k, lighting removed on meshy-6/7) | D-067 |
 | local `.stl`/`.obj`/`.fbx` for remesh, convert, resize, retexture, multi-color-print, analyze/repair-printability | sent inline, refused by the API (or stored under the wrong format) | refused locally (exit 2): pass a URL or `--input-task-id`; `.glb`/`.gltf` unchanged (multi-color-print: `.glb`) | D-070 |
