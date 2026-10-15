@@ -210,7 +210,7 @@ Each difference names the legacy behaviour, the CLI behaviour, and the evidence.
 | smart-topology polycount default with `--ai-model meshy-t2.5` | — | none sent (the API's 15,000); meshy-t2 still gets 10,000 | D-078 |
 | a Smart Topology `ai_model` without smart-topology, or smart-topology with `topology: "quad"` (through `--data`) | sent, refused by the API | refused locally (exit 2) | D-078 |
 
-### 3.10 Unreleased: Smart Topology defaults to T2.5
+### 3.10 Changes in 0.4.4: Smart Topology defaults to T2.5
 
 `image-to-3d` and `text-to-3d` preview now send `ai_model: "meshy-t2.5"`
 when `--model-type smart-topology` has no explicit model. The default face
