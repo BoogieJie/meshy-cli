@@ -21,7 +21,9 @@ const spec: ResourceCommandSpec = {
         .option("--model-url <src>", "textured humanoid .glb as http(s) URL or local file path")
         .option(
           "--texture-image-url <src>",
-          "the model's UV-unwrapped base color texture (.png; URL or local file) — for a --model-url input",
+          "deprecated; leave it out when the model has its own textures, which the rig keeps. " +
+            "Sending it makes this image the only texture and drops the PBR maps. " +
+            "Only for a --model-url .glb without textures: its UV-unwrapped base color (.png; URL or local file)",
         )
         .option(
           "--height-meters <m>",
