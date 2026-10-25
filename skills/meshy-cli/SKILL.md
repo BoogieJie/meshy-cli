@@ -142,6 +142,8 @@ These are API rules, not preferences — ignoring them produces failed tasks:
   not props, quadrupeds or untextured drafts. Too dense? `remesh` first. A
   successful rigging task already bundles walking and running clips
   (`result.basic_animations.*`), so check its result before calling `animate`.
+  Leave out `--texture-image-url`: the rig keeps the model's own textures, and
+  the flag replaces them with one image and drops the PBR maps.
 - **`animate` takes a rigging task id**, not a model task id, plus exactly one
   of: an integer `--action-id` from the catalog, `--action-ids` (up to 10, one
   file with one clip each, billed per action) or a text-to-motion
