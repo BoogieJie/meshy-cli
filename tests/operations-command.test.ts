@@ -8,12 +8,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { beginOperation, credentialFingerprint, payloadFingerprint, readOperation, resolveOperation, updateOperation } from "../src/internal/operation-store.js";
 import { CliError } from "../src/internal/errors.js";
-import { jsonReply, parseSingleJson, runCli, startMockApi, tmpDir } from "./helpers/cli.js";
+import { DIST_ENTRY, isolatedEnv, jsonReply, parseSingleJson, runCli, startMockApi, tmpDir } from "./helpers/cli.js";
 
 const identity = {
   resource: "text-to-motion",
@@ -75,6 +76,50 @@ test("resolve refuses what it must not touch: a missing id, an accepted record, 
   beginOperation(root, "op-live", identity);
   assert.equal(code(() => resolveOperation(root, "op-live", { as: "not_created" }, { isAlive: alive })), "operation_conflict");
   assert.equal(resolveOperation(root, "op-live", { as: "not_created" }, { isAlive: alive, force: true }).resolution, "not_created");
+});
+
+test("resolve matches the stored id, not the file name (ids that slug to the same file stay apart); binding the same task again is a no-op", () => {
+  const root = tmpDir("ops-resolve-");
+  beginOperation(root, "batch_7", identity);
+  updateOperation(root, "batch_7", { state: "unknown" });
+  assert.throws(() => resolveOperation(root, "batch/7", { as: "not_created" }), (e: unknown) => e instanceof CliError && e.code === "not_found");
+  assert.equal(readOperation(root, "batch_7")?.state, "unknown");
+
+  resolveOperation(root, "batch_7", { as: "created", taskId: "task-3" });
+  assert.equal(resolveOperation(root, "batch_7", { as: "created", taskId: "task-3" }).record?.task_id, "task-3");
+  assert.throws(() => resolveOperation(root, "batch_7", { as: "created", taskId: "task-4" }), (e: unknown) => e instanceof CliError && e.code === "operation_conflict");
+});
+
+test("a started record owned by this very pid (PID 1 in a fresh container) is not treated as in flight", () => {
+  const root = tmpDir("ops-resolve-");
+  beginOperation(root, "op-self", identity);
+  assert.equal(readOperation(root, "op-self")?.pid, process.pid);
+  assert.equal(resolveOperation(root, "op-self", { as: "not_created" }).resolution, "not_created");
+});
+
+test("one SIGTERM ends a command that does not observe the abort (auth login waiting for the browser) within the grace period", { timeout: 20_000 }, async () => {
+  const port = await new Promise<number>((resolve) => {
+    const probe = createServer().listen(0, "127.0.0.1", () => {
+      const p = (probe.address() as { port: number }).port;
+      probe.close(() => resolve(p));
+    });
+  });
+  const child = spawn(process.execPath, [DIST_ENTRY, "auth", "login", "--port", String(port)], {
+    env: isolatedEnv({ MESHY_OAUTH_AUTHORIZE_URL: "http://127.0.0.1:1/oauth/authorize", MESHY_CLI_FORCE_GUI: "1" }) as NodeJS.ProcessEnv,
+  });
+  let stderr = "";
+  let sentAt = 0;
+  child.stderr.on("data", (c: Buffer) => {
+    stderr += c.toString();
+    if (!sentAt && stderr.includes("oauth/authorize")) {
+      sentAt = Date.now();
+      child.kill("SIGTERM");
+    }
+  });
+  const code = await new Promise<number | null>((resolve) => child.on("close", (c) => resolve(c)));
+  assert.ok(sentAt, `the login flow started: ${stderr}`);
+  assert.equal(code, 130, stderr);
+  assert.ok(Date.now() - sentAt < 8_000, `exited ${Date.now() - sentAt}ms after a single SIGTERM`);
 });
 
 const CREATE = ["text-to-motion", "create", "--prompt", "jet entry", "--mode", "prime", "--duration", "3", "--async", "--operation-id", "lf-jet_entry", "--output-schema", "v1"];
@@ -145,6 +190,9 @@ test("a record left `started` by a hard kill: operations list shows it, resolve 
 
     const usage = await runCli(["operations", "resolve", "lf-jet_entry", "--output-schema", "v1"], { env });
     assert.equal(usage.code, 2, "exactly one of --task-id / --not-created");
+    const empty = await runCli(["operations", "resolve", "lf-jet_entry", "--task-id", "", "--not-created", "--output-schema", "v1"], { env });
+    assert.equal(empty.code, 2, "an empty --task-id is not --not-created");
+    assert.equal(readOperation(join(env["MESHY_CONFIG_DIR"]!, "operations"), "lf-jet_entry")?.task_id, "task-found");
   } finally {
     await api.close();
   }

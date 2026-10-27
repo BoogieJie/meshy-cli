@@ -64,7 +64,9 @@ one JSON document (`ndjson` streams emit one line per event plus a final
   means the process was killed mid-request; resolve it the same way.
   `meshy operations list [--state …]` and `show <id>` read the journal. SIGINT,
   SIGTERM and SIGHUP all stop the command cooperatively (exit 130), so the
-  journal records what is known; only a hard kill leaves `started`.
+  journal records what is known; only a hard kill leaves `started`. After a
+  SIGTERM or SIGHUP the process exits within 3 s even when the command cannot
+  stop sooner (e.g. `auth login` waiting for the browser).
 - `--operation-id <id>` replays the recorded outcome of an identical earlier
   request instead of submitting again; a different request under the same id is
   refused (`operation_conflict`, exit 2, naming what differs). "Identical" means

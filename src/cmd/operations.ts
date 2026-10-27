@@ -39,7 +39,7 @@ const showCommand = new Command("show")
     buildLocalRuntime(opened.flags);
     const root = operationsRoot();
     const record = readOperation(root, operationId);
-    if (!record) {
+    if (!record || record.operation_id !== operationId) {
       throw new CliError({ code: "not_found", message: `no operation ${operationId} in ${root}`, recovery: { action: "none", automatic: false, command: "meshy operations list" } });
     }
     await emitResult(opened, record, { root, operation: record });
@@ -56,10 +56,12 @@ const resolveCommand = new Command("resolve")
   .action(async (operationId: string, opts: { taskId?: string; notCreated?: boolean; force?: boolean }, thisCmd: Command) => {
     const opened = openCommand(thisCmd, "operations.resolve", "v1");
     buildLocalRuntime(opened.flags);
-    if (Boolean(opts.taskId) === Boolean(opts.notCreated)) {
+    if ((opts.taskId !== undefined) === Boolean(opts.notCreated)) {
       throw new UsageError("pass exactly one of --task-id <id> or --not-created");
     }
-    const res = resolveOperation(operationsRoot(), operationId, opts.taskId ? { as: "created", taskId: opts.taskId } : { as: "not_created" }, { force: opts.force });
+    const taskId = opts.taskId?.trim();
+    if (opts.taskId !== undefined && !taskId) throw new UsageError("--task-id needs a task id");
+    const res = resolveOperation(operationsRoot(), operationId, taskId ? { as: "created", taskId } : { as: "not_created" }, { force: opts.force });
     await emitResult(opened, res, res);
   });
 

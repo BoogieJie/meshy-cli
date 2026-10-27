@@ -62,10 +62,15 @@ export function shouldRunUpdateCheck(argv: string[], env: NodeJS.ProcessEnv = pr
   return true;
 }
 
+/** How long a SIGTERM / SIGHUP waits for the cooperative stop before the process exits anyway. */
+export const TERMINATE_GRACE_MS = 3_000;
+
 /**
  * SIGTERM and SIGHUP (a harness timing the command out, a closed terminal)
  * take the same cooperative path as SIGINT, so the operation journal records
- * what is known instead of being left at `started` by a hard kill.
+ * what is known instead of being left at `started` by a hard kill. A command
+ * that does not observe the abort (an `auth login` waiting for a person) still
+ * exits after TERMINATE_GRACE_MS, as a terminate signal should.
  */
 function installSignalHandlers(): void {
   let count = 0;
@@ -75,8 +80,12 @@ function installSignalHandlers(): void {
       if (count === 1) {
         markInterrupted(signal);
         stopActiveProgress();
-        const how = signal === "SIGINT" ? "interrupted — finishing local bookkeeping; press Ctrl-C again to force exit" : `interrupted by ${signal} — finishing local bookkeeping; send it again to force exit`;
-        process.stderr.write(`\n${how}\n`);
+        if (signal === "SIGINT") {
+          process.stderr.write("\ninterrupted — finishing local bookkeeping; press Ctrl-C again to force exit\n");
+          return;
+        }
+        process.stderr.write(`\ninterrupted by ${signal} — finishing local bookkeeping\n`);
+        setTimeout(() => process.exit(130), TERMINATE_GRACE_MS).unref();
         return;
       }
       process.exit(130);

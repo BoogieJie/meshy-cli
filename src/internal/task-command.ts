@@ -874,6 +874,7 @@ export async function submitCreate(
         next: nextCommands(descriptor, created.taskId),
         ...extra,
       },
+      hint: `The journal still says 'started'; record the task with \`meshy operations resolve ${operationId} --task-id ${created.taskId}\` once the journal is writable again.`,
       cause: journalErr,
     });
   }

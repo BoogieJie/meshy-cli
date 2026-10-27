@@ -319,9 +319,9 @@ export interface ResolveResult {
  * Record what the caller found when reconciling with `<resource> list`:
  * `created` binds the task id (a replay returns it, no new POST),
  * `not_created` moves the record to `resolved/` so the same operation id
- * submits fresh. An accepted record is never touched, and a `started` record
- * whose process is still alive may still be in flight, so it is refused
- * unless `force`.
+ * submits fresh. An accepted record is never touched (binding the task it
+ * already has is a no-op), and a `started` record whose process is still
+ * alive may still be in flight, so it is refused unless `force`.
  */
 export function resolveOperation(
   root: string,
@@ -334,7 +334,8 @@ export function resolveOperation(
   mkdirSync(root, { recursive: true, mode: 0o700 });
   return withFileLock(lockPath(root), () => {
     const existing = readOperation(root, operationId);
-    if (!existing) {
+    // The file name is a lossy slug of the id, so another id can share it.
+    if (!existing || existing.operation_id !== operationId) {
       throw new CliError({
         code: "not_found",
         message: `no operation ${operationId} in ${root}`,
@@ -344,6 +345,9 @@ export function resolveOperation(
     const previous = existing.state;
     const conflict = (message: string): CliError =>
       new CliError({ code: "operation_conflict", message, result: { submission: { state: previous, operation_id: operationId, task_id: existing.task_id } } });
+    if (previous === "accepted" && resolution.as === "created" && existing.task_id === resolution.taskId) {
+      return { operation_id: operationId, previous_state: previous, resolution: "created", record: existing, archived_to: null };
+    }
     if (previous === "accepted") {
       throw conflict(`operation ${operationId} was accepted as task ${existing.task_id ?? "(unknown)"}; there is nothing to resolve (a replay returns that task)`);
     }
@@ -371,8 +375,9 @@ export function resolveOperation(
   });
 }
 
+/** Whether another local process has this pid; our own pid (PID 1 in a fresh container) is never the owner. */
 function processAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
   try {
     process.kill(pid, 0);
     return true;
