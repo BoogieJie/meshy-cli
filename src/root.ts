@@ -36,6 +36,7 @@ import { makeCommand } from "./cmd/make.js";
 import { meshCommand } from "./cmd/mesh.js";
 import { multiColorPrintCommand } from "./cmd/multi-color-print.js";
 import { multiImageTo3dCommand } from "./cmd/multi-image-to-3d.js";
+import { operationsCommand } from "./cmd/operations.js";
 import { projectCommand } from "./cmd/project.js";
 import { remeshCommand } from "./cmd/remesh.js";
 import { repairPrintabilityCommand } from "./cmd/repair-printability.js";
@@ -62,6 +63,7 @@ export const V1_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "showcases",
   "download",
   "project",
+  "operations",
   "inspect",
   "mesh",
   "slicer",
@@ -77,6 +79,7 @@ export const V1_ONLY_COMMANDS: ReadonlySet<string> = new Set([
 export const LOCAL_COMMANDS: ReadonlySet<string> = new Set([
   "resources",
   "project",
+  "operations",
   "inspect",
   "mesh",
   "slicer",
@@ -205,6 +208,7 @@ export function buildRootCommand(): Command {
     showcasesCommand,
     downloadCommand,
     projectCommand,
+    operationsCommand,
     inspectCommand,
     meshCommand,
     slicerCommand,

@@ -852,6 +852,7 @@ export async function submitCreate(
         automatic: false,
         command: `meshy ${descriptor.commandPath.join(" ")} list --output-schema v1   # then match operation ${operationId} by time/prompt before creating again`,
       },
+      hint: resolveHint(operationId),
       result: { submission: { state: "unknown", operation_id: operationId, task_id: null }, task: null, downloads: NOT_REQUESTED(), ...extra },
       warnings,
       cause: err,
@@ -873,6 +874,7 @@ export async function submitCreate(
         next: nextCommands(descriptor, created.taskId),
         ...extra,
       },
+      hint: `The journal still says 'started'; record the task with \`meshy operations resolve ${operationId} --task-id ${created.taskId}\` once the journal is writable again.`,
       cause: journalErr,
     });
   }
@@ -894,14 +896,20 @@ function replayExisting(record: OperationRecord, descriptor: TaskResourceDescrip
       code: "submission_unknown",
       message: `operation ${operationId} is recorded as '${record.state}' since ${record.updated_at}; reconcile it before submitting again (nothing was sent now)`,
       recovery: { action: "reconcile", automatic: false, command: `meshy ${descriptor.commandPath.join(" ")} list --output-schema v1` },
+      hint: resolveHint(operationId),
       result: { submission: { state: "unknown", operation_id: operationId, task_id: record.task_id }, task: null, ...extra },
     });
   }
   throw new CliError({
     code: "operation_conflict",
-    message: `operation ${operationId} was already ${record.state} on ${record.updated_at} (${record.error ?? "no detail"}); use a new --operation-id to submit again`,
+    message: `operation ${operationId} was already ${record.state} on ${record.updated_at} (${record.error ?? "no detail"}); use a new --operation-id to submit again, or release this one with \`meshy operations resolve ${operationId} --not-created\``,
     result: { submission: { state: record.state, operation_id: operationId, task_id: record.task_id }, task: null, ...extra },
   });
+}
+
+/** After `list`: bind the task it shows, or release the id when it shows none. */
+function resolveHint(operationId: string): string {
+  return `After checking list: \`meshy operations resolve ${operationId} --task-id <task-id>\` binds the task it shows; \`meshy operations resolve ${operationId} --not-created\` releases the id when it shows none.`;
 }
 
 function classifySubmissionFailure(err: unknown): { state: "rejected" | "not_submitted" | "unknown" } {
