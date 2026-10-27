@@ -4,7 +4,7 @@
  *
  * Responsibilities kept here on purpose:
  *   - decide whether the background update check may run before anything else;
- *   - turn SIGINT into a cooperative abort (exit 130) instead of a hard kill;
+ *   - turn SIGINT / SIGTERM / SIGHUP into a cooperative abort (exit 130) instead of a hard kill;
  *   - route every failure — including Commander parse errors — through one
  *     exit that renders the payload in the schema the command would have used;
  *   - flush stdout before exiting.
@@ -13,7 +13,7 @@
 import type { Command } from "commander";
 
 import { buildRootCommand, V1_ONLY_COMMANDS, LOCAL_COMMANDS } from "./root.js";
-import { currentCommand, markInterrupted, wasInterrupted } from "./internal/context.js";
+import { currentCommand, interruptedBy, markInterrupted, wasInterrupted } from "./internal/context.js";
 import { exitCodeFor, isCommanderInformational, reportError, CliError } from "./internal/errors.js";
 import { painterFor } from "./internal/color.js";
 import { emitEnvelope, printWarnings, writeStdout, type OutputFormat } from "./internal/output.js";
@@ -62,18 +62,26 @@ export function shouldRunUpdateCheck(argv: string[], env: NodeJS.ProcessEnv = pr
   return true;
 }
 
+/**
+ * SIGTERM and SIGHUP (a harness timing the command out, a closed terminal)
+ * take the same cooperative path as SIGINT, so the operation journal records
+ * what is known instead of being left at `started` by a hard kill.
+ */
 function installSignalHandlers(): void {
   let count = 0;
-  process.on("SIGINT", () => {
-    count += 1;
-    if (count === 1) {
-      markInterrupted();
-      stopActiveProgress();
-      process.stderr.write("\ninterrupted — finishing local bookkeeping; press Ctrl-C again to force exit\n");
-      return;
-    }
-    process.exit(130);
-  });
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.on(signal, () => {
+      count += 1;
+      if (count === 1) {
+        markInterrupted(signal);
+        stopActiveProgress();
+        const how = signal === "SIGINT" ? "interrupted — finishing local bookkeeping; press Ctrl-C again to force exit" : `interrupted by ${signal} — finishing local bookkeeping; send it again to force exit`;
+        process.stderr.write(`\n${how}\n`);
+        return;
+      }
+      process.exit(130);
+    });
+  }
 }
 
 async function reportFailure(program: Command, argv: string[], err: unknown): Promise<number> {
@@ -88,7 +96,7 @@ async function reportFailure(program: Command, argv: string[], err: unknown): Pr
     wasInterrupted() && !(err instanceof CliError && err.code === "interrupted")
       ? new CliError({
           code: "interrupted",
-          message: `interrupted by SIGINT${err instanceof Error && err.message ? ` (${err.message})` : ""}`,
+          message: `interrupted by ${interruptedBy()}${err instanceof Error && err.message ? ` (${err.message})` : ""}`,
           result: err instanceof CliError ? err.result : null,
           warnings: err instanceof CliError ? err.warnings : [],
           recovery: err instanceof CliError ? err.recovery : null,

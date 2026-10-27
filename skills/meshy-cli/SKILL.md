@@ -228,6 +228,10 @@ Exit codes: `0` ok · `1` task FAILED/CANCELED while waiting, or unclassified ·
   mid-request) there is deliberately no command and `recovery` is null — restore the
   directory first, then record with `meshy project record` from inside the original workspace.
 - Exit 10 → reconcile with `<resource> list`; never submit the same create again blindly.
+  Then record the finding: `meshy operations resolve <operation-id> --task-id <id>` if the
+  task is in the list, `--not-created` if it is not (the same `--operation-id` then submits
+  once). A replay that says the operation is `started` is the same case (the earlier
+  process was killed mid-request).
 - A `FAILED` task → relay `result.task.task_error.message` verbatim; do not guess a cause.
 - Any error may carry `error.recovery.command` — prefer it over improvising.
 

@@ -157,6 +157,7 @@ meshy inspect faces --task-json ./task.json --max-faces 300000
 meshy mesh prepare-print ./model.obj --height-mm 75
 meshy slicer detect
 meshy doctor
+meshy operations list --state unknown     # the local journal of create requests
 
 # raw passthrough for any endpoint
 meshy-cli api GET  /balance

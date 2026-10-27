@@ -30,7 +30,7 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { writeJsonFile } from "./atomic-file.js";
 import { configDir } from "./credentials.js";
@@ -60,6 +60,8 @@ export interface OperationRecord {
   cli_version: string;
   /** Optional link to the project that owns the task (set by --project). */
   project: string | null;
+  /** Set by `meshy operations resolve`: the caller's reconciliation of a `started`/`unknown` record. */
+  resolution?: { as: "created" | "not_created"; previous_state: OperationState; at: string };
 }
 
 export interface OperationIdentity {
@@ -299,4 +301,82 @@ export function listOperations(root: string): OperationRecord[] {
     }
   }
   return out.sort((a, b) => a.started_at.localeCompare(b.started_at));
+}
+
+export type Resolution = { as: "created"; taskId: string } | { as: "not_created" };
+
+export interface ResolveResult {
+  operation_id: string;
+  previous_state: OperationState;
+  resolution: Resolution["as"];
+  /** The record as it now stands; null after not_created (the id is free again). */
+  record: OperationRecord | null;
+  /** Where a released record was kept (not_created). */
+  archived_to: string | null;
+}
+
+/**
+ * Record what the caller found when reconciling with `<resource> list`:
+ * `created` binds the task id (a replay returns it, no new POST),
+ * `not_created` moves the record to `resolved/` so the same operation id
+ * submits fresh. An accepted record is never touched, and a `started` record
+ * whose process is still alive may still be in flight, so it is refused
+ * unless `force`.
+ */
+export function resolveOperation(
+  root: string,
+  operationId: string,
+  resolution: Resolution,
+  opts: { force?: boolean; now?: () => Date; isAlive?: (pid: number) => boolean } = {},
+): ResolveResult {
+  const now = opts.now ?? (() => new Date());
+  const isAlive = opts.isAlive ?? processAlive;
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  return withFileLock(lockPath(root), () => {
+    const existing = readOperation(root, operationId);
+    if (!existing) {
+      throw new CliError({
+        code: "not_found",
+        message: `no operation ${operationId} in ${root}`,
+        recovery: { action: "none", automatic: false, command: "meshy operations list" },
+      });
+    }
+    const previous = existing.state;
+    const conflict = (message: string): CliError =>
+      new CliError({ code: "operation_conflict", message, result: { submission: { state: previous, operation_id: operationId, task_id: existing.task_id } } });
+    if (previous === "accepted") {
+      throw conflict(`operation ${operationId} was accepted as task ${existing.task_id ?? "(unknown)"}; there is nothing to resolve (a replay returns that task)`);
+    }
+    if (resolution.as === "created" && (previous === "rejected" || previous === "not_submitted")) {
+      throw conflict(`operation ${operationId} is ${previous}, so the server created no task for it; use --not-created to submit it again`);
+    }
+    if (previous === "started" && !opts.force && isAlive(existing.pid)) {
+      throw conflict(
+        `operation ${operationId} was started by process ${existing.pid}, which is still running, so its request may still be in flight; ` +
+          "wait for it to exit, or pass --force if that process is not meshy",
+      );
+    }
+    const at = now().toISOString();
+    const stamp = { as: resolution.as, previous_state: previous, at };
+    if (resolution.as === "created") {
+      const next: OperationRecord = { ...existing, state: "accepted", task_id: resolution.taskId, updated_at: at, resolution: stamp };
+      writeJsonFile(recordPath(root, operationId), next, { overwrite: true, mode: 0o600 });
+      return { operation_id: operationId, previous_state: previous, resolution: "created", record: next, archived_to: null };
+    }
+    const archived = join(root, "resolved", `${safeSegment(operationId, "op")}.${at.replace(/[:.]/g, "-")}.json`);
+    mkdirSync(join(root, "resolved"), { recursive: true, mode: 0o700 });
+    writeJsonFile(archived, { ...existing, updated_at: at, resolution: stamp }, { overwrite: false, mode: 0o600 });
+    unlinkSync(recordPath(root, operationId));
+    return { operation_id: operationId, previous_state: previous, resolution: "not_created", record: null, archived_to: archived };
+  });
+}
+
+function processAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
